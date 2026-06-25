@@ -11,13 +11,20 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc tsconfig.base.json t
 COPY lib ./lib
 COPY artifacts/api-server ./artifacts/api-server
 
-RUN pnpm install --frozen-lockfile --filter @workspace/api-server...
+# api-server tree + @workspace/db (incl. drizzle-kit for the migrate target)
+RUN pnpm install --frozen-lockfile --filter @workspace/api-server... --filter @workspace/db...
 
 WORKDIR /app/artifacts/api-server
 RUN pnpm run build
 
 WORKDIR /app
 RUN pnpm deploy --filter @workspace/api-server --prod /prod
+
+FROM builder AS migrate
+
+WORKDIR /app
+
+CMD ["pnpm", "--filter", "@workspace/db", "run", "push"]
 
 FROM node:24-alpine AS runner
 

@@ -1,4 +1,17 @@
 services:
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+      target: migrate
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    restart: "no"
+    networks:
+      - lifeops
+
   backend:
     build:
       context: .
@@ -7,8 +20,12 @@ services:
       - .env
     environment:
       NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
     expose:
       - "${PORT}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     networks:
       - lifeops
