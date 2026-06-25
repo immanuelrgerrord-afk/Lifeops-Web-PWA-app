@@ -5,6 +5,7 @@ import { useColors } from "@/hooks/useColors";
 import { CategoryBadge } from "@/components/CategoryChip";
 import { toDisplayDate } from "@/utils/date";
 import { formatINR } from "@/utils/numeric";
+import { formatRecurrenceLine } from "@/utils/recurrenceDisplay";
 
 interface TransactionItemProps {
   categoryName: string;
@@ -17,6 +18,8 @@ interface TransactionItemProps {
   type: "income" | "expense";
   recurrenceType?: string;
   recurrenceLabel?: string;
+  recurrenceStartDate?: string;
+  recurrenceEndDate?: string;
   occurrences?: number;
   totalPlannedCost?: number;
   onEdit?: () => void;
@@ -39,6 +42,8 @@ export function TransactionItem({
   type,
   recurrenceType,
   recurrenceLabel,
+  recurrenceStartDate,
+  recurrenceEndDate,
   occurrences,
   totalPlannedCost,
   onEdit,
@@ -69,10 +74,20 @@ export function TransactionItem({
         ) : null}
         {isRecurring ? (
           <Text style={[styles.recurrence, { color: colors.textSecondary }]}>
-            {formatINR(unitAmount)} {recurrenceLabel ?? recurrenceType} × {occurrences ?? 1}
+            {formatRecurrenceLine(
+              unitAmount,
+              recurrenceLabel ?? recurrenceType ?? "",
+              occurrences ?? 1,
+              recurrenceStartDate,
+              recurrenceEndDate,
+            )}
           </Text>
+        ) : (
+          <Text style={[styles.date, { color: colors.textSecondary }]}>{toDisplayDate(date)}</Text>
+        )}
+        {isRecurring ? (
+          <Text style={[styles.date, { color: colors.textSecondary }]}>{toDisplayDate(date)}</Text>
         ) : null}
-        <Text style={[styles.date, { color: colors.textSecondary }]}>{toDisplayDate(date)}</Text>
         {isRecurring && totalPlannedCost != null ? (
           <Text style={[styles.planned, { color: colors.textSecondary }]}>
             Total Planned {formatINR(totalPlannedCost)}

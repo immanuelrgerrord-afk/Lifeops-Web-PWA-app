@@ -1,11 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import {
-  useDeleteIncome,
-  useGetIncomes,
-  getGetIncomesQueryKey,
-  getGetDashboardQueryKey,
-  type Income,
-} from "@workspace/api-client-react";
+import { useDeleteIncome, useGetIncomes, type Income } from "@workspace/api-client-react";
+import { invalidateFinancialData } from "@/utils/queryInvalidation";
 import { useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
 import {
@@ -58,10 +53,7 @@ export default function IncomeScreen() {
 
   const deleteMutation = useDeleteIncome({
     mutation: {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getGetIncomesQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
-      },
+      onSuccess: () => invalidateFinancialData(qc),
     },
   });
 
@@ -136,6 +128,8 @@ export default function IncomeScreen() {
             type="income"
             recurrenceType={item.recurrenceType}
             recurrenceLabel={ext.recurrenceLabel}
+            recurrenceStartDate={(item as Income & { recurrenceStartDate?: string }).recurrenceStartDate}
+            recurrenceEndDate={(item as Income & { recurrenceEndDate?: string }).recurrenceEndDate}
             occurrences={item.occurrences}
             totalPlannedCost={ext.totalPlannedCost}
             onEdit={() => { setEditing(item); setModalVisible(true); }}

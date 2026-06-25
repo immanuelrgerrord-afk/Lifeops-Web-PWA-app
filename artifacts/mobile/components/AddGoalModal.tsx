@@ -2,10 +2,9 @@ import { Feather } from "@expo/vector-icons";
 import {
   useCreateGoal,
   useUpdateGoal,
-  getGetGoalsQueryKey,
-  getGetDashboardQueryKey,
   type Goal,
 } from "@workspace/api-client-react";
+import { invalidateFinancialData } from "@/utils/queryInvalidation";
 import { useQueryClient } from "@tanstack/react-query";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -87,8 +86,7 @@ export function AddGoalModal({ visible, onClose, editing }: Props) {
   const createMutation = useCreateGoal({
     mutation: {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getGetGoalsQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        invalidateFinancialData(qc);
         onClose();
       },
     },
@@ -97,8 +95,7 @@ export function AddGoalModal({ visible, onClose, editing }: Props) {
   const updateMutation = useUpdateGoal({
     mutation: {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getGetGoalsQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        invalidateFinancialData(qc);
         onClose();
       },
     },

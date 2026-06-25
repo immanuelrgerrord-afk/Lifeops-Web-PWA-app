@@ -1,11 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import {
-  useDeleteExpense,
-  useGetExpenses,
-  getGetExpensesQueryKey,
-  getGetDashboardQueryKey,
-  type Expense,
-} from "@workspace/api-client-react";
+import { useDeleteExpense, useGetExpenses, type Expense } from "@workspace/api-client-react";
+import { invalidateFinancialData } from "@/utils/queryInvalidation";
 import { useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
 import {
@@ -61,10 +56,7 @@ export default function ExpensesScreen() {
 
   const deleteMutation = useDeleteExpense({
     mutation: {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getGetExpensesQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
-      },
+      onSuccess: () => invalidateFinancialData(qc),
     },
   });
 
@@ -144,6 +136,8 @@ export default function ExpensesScreen() {
             recurrenceType={item.recurrenceType ?? "one-time"}
             occurrences={item.occurrences ?? 1}
             recurrenceLabel={ext.recurrenceLabel}
+            recurrenceStartDate={(item as Expense & { recurrenceStartDate?: string }).recurrenceStartDate}
+            recurrenceEndDate={(item as Expense & { recurrenceEndDate?: string }).recurrenceEndDate}
             totalPlannedCost={ext.totalPlannedCost}
             emiDetails={ext.emiDetails}
             onEdit={() => { setEditing(item); setModalVisible(true); }}

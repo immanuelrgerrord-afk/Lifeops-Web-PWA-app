@@ -106,6 +106,8 @@ export interface Income {
   nextOccurrenceDate?: string | null;
   parentId?: number | null;
   recurrenceLabel?: string;
+  recurrenceStartDate?: string;
+  recurrenceEndDate?: string;
   totalPlannedCost?: number;
   createdAt: string;
   updatedAt: string;
@@ -152,6 +154,8 @@ export interface Expense {
   nextOccurrenceDate?: string | null;
   parentId?: number | null;
   recurrenceLabel?: string;
+  recurrenceStartDate?: string;
+  recurrenceEndDate?: string;
   totalPlannedCost?: number;
   emiDetails?: EmiDetails;
   createdAt: string;
@@ -248,6 +252,54 @@ export interface UpcomingRecurringItem {
   amount: number;
   recurrenceType: string;
   nextDate: string;
+  occurrences?: number;
+  recurrenceLabel?: string;
+  totalPlannedCost?: number;
+  startDate?: string;
+  endDate?: string;
+}
+
+export type MonthlyFixedCommitmentSource = typeof MonthlyFixedCommitmentSource[keyof typeof MonthlyFixedCommitmentSource];
+
+
+export const MonthlyFixedCommitmentSource = {
+  loan: 'loan',
+  expense: 'expense',
+} as const;
+
+export interface MonthlyFixedCommitment {
+  id: string;
+  name: string;
+  categoryName: string;
+  categoryIcon?: string;
+  categoryColor?: string;
+  monthlyAmount: number;
+  source: MonthlyFixedCommitmentSource;
+}
+
+export interface MonthlyFixedCommitments {
+  items: MonthlyFixedCommitment[];
+  totalMonthlyCommitment: number;
+}
+
+export interface LoanDashboardItem {
+  id: number;
+  name: string;
+  emi: number;
+  emiDueThisMonth: number;
+  outstandingBalance: number;
+  remainingInterest: number;
+  completionPercentage: number;
+  isActive: boolean;
+}
+
+export interface LoanDashboardSummary {
+  activeLoans: number;
+  totalOutstanding: number;
+  totalRemainingInterest: number;
+  emiDueThisMonth: number;
+  avgLoanCompletion: number;
+  loans: LoanDashboardItem[];
 }
 
 export interface CategorySummary {
@@ -265,6 +317,8 @@ export interface DashboardSummary {
   activeLoans: number;
   totalOutstanding: number;
   emiDueThisMonth: number;
+  totalRemainingInterest: number;
+  avgLoanCompletion: number;
   goalsCount: number;
   avgGoalProgress: number;
   monthlyIncomes: Income[];
@@ -274,6 +328,8 @@ export interface DashboardSummary {
   upcomingRecurringExpenses?: UpcomingRecurringItem[];
   topSpendingCategories: CategorySummary[];
   topIncomeCategories: CategorySummary[];
+  loanSummary: LoanDashboardSummary;
+  monthlyFixedCommitments: MonthlyFixedCommitments;
 }
 
 export type GetCategoriesParams = {

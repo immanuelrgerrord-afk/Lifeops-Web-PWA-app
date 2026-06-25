@@ -44,18 +44,8 @@ function nextMonth(m: string) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function fmtShort(n: number) {
-  if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
-  return `₹${n.toFixed(0)}`;
-}
-
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
+function fmtMoney(n: number) {
+  return formatINR(n);
 }
 
 function recurrenceLabel(type: string) {
@@ -66,6 +56,13 @@ function recurrenceLabel(type: string) {
     yearly: "Yearly",
   };
   return map[type] ?? type;
+}
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
 }
 
 export default function DashboardScreen() {
@@ -97,7 +94,8 @@ export default function DashboardScreen() {
   const upcomingExpenses = data?.upcomingRecurringExpenses ?? [];
   const topSpending = data?.topSpendingCategories ?? [];
   const topIncome = data?.topIncomeCategories ?? [];
-  const emiDue = data?.emiDueThisMonth ?? 0;
+  const commitments = data?.monthlyFixedCommitments;
+  const loanSummary = data?.loanSummary;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -165,44 +163,98 @@ export default function DashboardScreen() {
             <View style={styles.statsGrid}>
               <StatCard
                 label="Income"
-                value={fmtShort(data?.totalIncome ?? 0)}
+                value={fmtMoney(data?.totalIncome ?? 0)}
                 icon="trending-up"
                 accentColor={colors.income}
               />
               <StatCard
                 label="Expenses"
-                value={fmtShort(data?.totalExpenses ?? 0)}
+                value={fmtMoney(data?.totalExpenses ?? 0)}
                 icon="trending-down"
                 accentColor={colors.expense}
               />
             </View>
 
-            {/* Row 2: EMI Due + Net Savings */}
             <View style={styles.statsGrid}>
               <StatCard
-                label="EMI This Month"
-                value={fmtShort(emiDue)}
+                label="EMI Due"
+                value={fmtMoney(data?.emiDueThisMonth ?? 0)}
                 icon="calendar"
                 accentColor={colors.loan}
-                subtitle={emiDue > 0 ? `${data?.activeLoans ?? 0} loan${(data?.activeLoans ?? 0) !== 1 ? "s" : ""}` : "No active loans"}
+                subtitle={`${data?.activeLoans ?? 0} active loan${(data?.activeLoans ?? 0) !== 1 ? "s" : ""}`}
               />
               <StatCard
                 label="Net Savings"
-                value={fmtShort(data?.savings ?? 0)}
+                value={fmtMoney(data?.savings ?? 0)}
                 icon="save"
                 accentColor={colors.primary}
-                subtitle={(data?.savings ?? 0) < 0 ? "Overspent" : "After EMI"}
+                subtitle={(data?.savings ?? 0) < 0 ? "Overspent" : "Income − Expenses − EMI"}
               />
             </View>
 
-            {/* Row 3: Total Outstanding */}
-            <StatCard
-              label="Total Outstanding"
-              value={fmtShort(data?.totalOutstanding ?? 0)}
-              icon="credit-card"
-              accentColor={colors.loan}
-              subtitle={`${data?.activeLoans ?? 0} active loan${(data?.activeLoans ?? 0) !== 1 ? "s" : ""}`}
-            />
+            <View style={styles.statsGrid}>
+              <StatCard
+                label="Outstanding"
+                value={fmtMoney(data?.totalOutstanding ?? 0)}
+                icon="credit-card"
+                accentColor={colors.loan}
+                subtitle={`${(data?.avgLoanCompletion ?? 0).toFixed(0)}% avg completion`}
+              />
+              <StatCard
+                label="Remaining Interest"
+                value={fmtMoney(data?.totalRemainingInterest ?? 0)}
+                icon="percent"
+                accentColor={colors.loan}
+                subtitle={`${data?.activeLoans ?? 0} active loan${(data?.activeLoans ?? 0) !== 1 ? "s" : ""}`}
+              />
+            </View>
+
+            {(loanSummary?.loans?.length ?? 0) > 0 && (
+              <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Active Loans</Text>
+                {loanSummary!.loans.filter((l) => l.isActive).map((loan) => (
+                  <View key={loan.id} style={styles.loanRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.loanName, { color: colors.text }]}>{loan.name}</Text>
+                      <Text style={[styles.loanMeta, { color: colors.textSecondary }]}>
+                        EMI {fmtMoney(loan.emi)} · {loan.completionPercentage}% complete
+                      </Text>
+                    </View>
+                    <Text style={[styles.loanAmount, { color: colors.loan }]}>
+                      {fmtMoney(loan.outstandingBalance)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {(commitments?.items?.length ?? 0) > 0 && (
+              <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Monthly Fixed Commitments</Text>
+                  <Text style={[styles.sectionBadge, { color: colors.expense }]}>
+                    {fmtMoney(commitments?.totalMonthlyCommitment ?? 0)}
+                  </Text>
+                </View>
+                {commitments!.items.map((item) => (
+                  <View key={item.id} style={styles.commitmentRow}>
+                    {item.categoryIcon ? (
+                      <CategoryBadge
+                        name={item.name}
+                        icon={item.categoryIcon}
+                        color={item.categoryColor}
+                        fallbackAccent={colors.expense}
+                        size={30}
+                      />
+                    ) : null}
+                    <Text style={[styles.categoryName, { color: colors.text }]}>{item.name}</Text>
+                    <Text style={[styles.categoryAmount, { color: colors.expense }]}>
+                      {fmtMoney(item.monthlyAmount)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
 
             {/* Goals */}
             {(data?.goalsCount ?? 0) > 0 && (
@@ -299,12 +351,18 @@ export default function DashboardScreen() {
                           <View>
                             <Text style={[styles.recurringName, { color: colors.text }]}>{item.categoryName}</Text>
                             <Text style={[styles.recurringMeta, { color: colors.textSecondary }]}>
-                              {recurrenceLabel(item.recurrenceType)} · {toDisplayDate(item.nextDate)}
+                              {formatINR(item.amount)} {recurrenceLabel(item.recurrenceType)} ×{item.occurrences ?? 1}
+                            </Text>
+                            <Text style={[styles.recurringMeta, { color: colors.textSecondary }]}>
+                              {toDisplayDate(item.startDate ?? item.nextDate)} → {toDisplayDate(item.endDate ?? item.nextDate)}
+                            </Text>
+                            <Text style={[styles.recurringMeta, { color: colors.textSecondary }]}>
+                              Total Planned {formatINR(item.totalPlannedCost ?? item.amount)}
                             </Text>
                           </View>
                         </View>
                         <Text style={[styles.recurringAmount, { color: colors.income }]}>
-                          +{fmtShort(item.amount)}
+                          +{fmtMoney(item.amount)}
                         </Text>
                       </View>
                     ))}
@@ -332,12 +390,18 @@ export default function DashboardScreen() {
                           <View>
                             <Text style={[styles.recurringName, { color: colors.text }]}>{item.categoryName}</Text>
                             <Text style={[styles.recurringMeta, { color: colors.textSecondary }]}>
-                              {recurrenceLabel(item.recurrenceType)} · {toDisplayDate(item.nextDate)}
+                              {formatINR(item.amount)} {recurrenceLabel(item.recurrenceType)} ×{item.occurrences ?? 1}
+                            </Text>
+                            <Text style={[styles.recurringMeta, { color: colors.textSecondary }]}>
+                              {toDisplayDate(item.startDate ?? item.nextDate)} → {toDisplayDate(item.endDate ?? item.nextDate)}
+                            </Text>
+                            <Text style={[styles.recurringMeta, { color: colors.textSecondary }]}>
+                              Total Planned {formatINR(item.totalPlannedCost ?? item.amount)}
                             </Text>
                           </View>
                         </View>
                         <Text style={[styles.recurringAmount, { color: colors.expense }]}>
-                          -{fmtShort(item.amount)}
+                          -{fmtMoney(item.amount)}
                         </Text>
                       </View>
                     ))}
@@ -363,6 +427,8 @@ export default function DashboardScreen() {
                     type={t.type}
                     recurrenceType={t.recurrenceType}
                     recurrenceLabel={(t as { recurrenceLabel?: string }).recurrenceLabel}
+                    recurrenceStartDate={(t as { recurrenceStartDate?: string }).recurrenceStartDate}
+                    recurrenceEndDate={(t as { recurrenceEndDate?: string }).recurrenceEndDate}
                     occurrences={t.occurrences}
                     totalPlannedCost={(t as { totalPlannedCost?: number }).totalPlannedCost}
                   />
@@ -444,6 +510,11 @@ const styles = StyleSheet.create({
   categoryRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 },
   categoryName: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium" },
   categoryAmount: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  loanRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 },
+  loanName: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  loanMeta: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  loanAmount: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  commitmentRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 },
   emptyState: { alignItems: "center", paddingVertical: 60, gap: 12 },
   emptyTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold" },
   emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },

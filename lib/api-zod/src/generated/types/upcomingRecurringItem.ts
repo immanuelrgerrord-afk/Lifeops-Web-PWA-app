@@ -14,4 +14,9 @@ export interface UpcomingRecurringItem {
   amount: number;
   recurrenceType: string;
   nextDate: string;
+  occurrences?: number;
+  recurrenceLabel?: string;
+  totalPlannedCost?: number;
+  startDate?: string;
+  endDate?: string;
 }

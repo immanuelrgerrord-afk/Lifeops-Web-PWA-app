@@ -1,11 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import {
-  useDeleteGoal,
-  useGetGoals,
-  getGetGoalsQueryKey,
-  getGetDashboardQueryKey,
-  type Goal,
-} from "@workspace/api-client-react";
+import { useDeleteGoal, useGetGoals, type Goal } from "@workspace/api-client-react";
+import { invalidateFinancialData } from "@/utils/queryInvalidation";
 import { useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
 import {
@@ -35,10 +30,7 @@ export default function GoalsScreen() {
 
   const deleteMutation = useDeleteGoal({
     mutation: {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getGetGoalsQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
-      },
+      onSuccess: () => invalidateFinancialData(qc),
     },
   });
 

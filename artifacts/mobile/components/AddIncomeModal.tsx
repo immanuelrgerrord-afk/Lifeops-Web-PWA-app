@@ -3,10 +3,9 @@ import {
   useCreateIncome,
   useGetCategories,
   useUpdateIncome,
-  getGetIncomesQueryKey,
-  getGetDashboardQueryKey,
   type Income,
 } from "@workspace/api-client-react";
+import { invalidateFinancialData } from "@/utils/queryInvalidation";
 import { useQueryClient } from "@tanstack/react-query";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -94,8 +93,7 @@ export function AddIncomeModal({ visible, onClose, editing }: Props) {
   const createMutation = useCreateIncome({
     mutation: {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getGetIncomesQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        invalidateFinancialData(qc);
         onClose();
       },
     },
@@ -104,8 +102,7 @@ export function AddIncomeModal({ visible, onClose, editing }: Props) {
   const updateMutation = useUpdateIncome({
     mutation: {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getGetIncomesQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        invalidateFinancialData(qc);
         onClose();
       },
     },

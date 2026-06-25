@@ -114,12 +114,10 @@ export function emiAmountForMonth(
   const asOfMonth = formatISODate(asOf).slice(0, 7);
   if (month > asOfMonth) return 0;
 
-  const metrics = formatLoanMetrics(loan, monthEnd);
-  if (metrics.monthsCompleted <= 0) return 0;
-
   const totalMonths = loan.tenureYears * 12;
-  const elapsedAtMonthStart = monthsElapsed(loan.startDate, new Date(y, mo - 1, 1));
-  if (elapsedAtMonthStart >= totalMonths) return 0;
+  const completedBeforeMonth =
+    monthsElapsed(loan.startDate, new Date(y, mo - 1, 0)) >= totalMonths;
+  if (completedBeforeMonth) return 0;
 
   return Number(loan.emi);
 }

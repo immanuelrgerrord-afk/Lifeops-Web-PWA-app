@@ -5,6 +5,7 @@ import { useColors } from "@/hooks/useColors";
 import { CategoryBadge } from "@/components/CategoryChip";
 import { toDisplayDate } from "@/utils/date";
 import { formatINR } from "@/utils/numeric";
+import { formatRecurrenceLine } from "@/utils/recurrenceDisplay";
 
 interface EmiDetails {
   matched: boolean;
@@ -33,6 +34,8 @@ interface ExpenseCardProps {
   recurrenceType: string;
   occurrences: number;
   recurrenceLabel?: string;
+  recurrenceStartDate?: string;
+  recurrenceEndDate?: string;
   totalPlannedCost?: number;
   emiDetails?: EmiDetails;
   onEdit?: () => void;
@@ -61,6 +64,8 @@ export function ExpenseCard({
   recurrenceType,
   occurrences,
   recurrenceLabel: recurrenceLabelProp,
+  recurrenceStartDate,
+  recurrenceEndDate,
   totalPlannedCost,
   emiDetails,
   onEdit,
@@ -96,7 +101,7 @@ export function ExpenseCard({
 
           {isRecurring ? (
             <Text style={[styles.recurrence, { color: colors.textSecondary }]}>
-              {formatINR(unitAmount)} {recLabel} × {occurrences}
+              {formatRecurrenceLine(unitAmount, recLabel, occurrences, recurrenceStartDate, recurrenceEndDate)}
             </Text>
           ) : (
             <Text style={[styles.recurrence, { color: colors.textSecondary }]}>
@@ -129,21 +134,22 @@ export function ExpenseCard({
         </View>
       )}
 
-      {isEMI && emiDetails && (
+      {isEMI && (
         <View style={[styles.emiBox, { backgroundColor: colors.expense + "08", borderColor: colors.expense + "25" }]}>
           <View style={styles.emiHeader}>
             <Text style={[styles.emiTitle, { color: colors.text }]}>EMI Details</Text>
-            <Text style={[styles.emiAmount, { color: colors.expense }]}>{formatINR(emiDetails.emiAmount)}</Text>
+            <Text style={[styles.emiAmount, { color: colors.expense }]}>
+              {formatINR(emiDetails?.emiAmount ?? amount)}
+            </Text>
           </View>
 
-          {emiDetails.loanName ? (
+          {emiDetails?.loanName ? (
             <Text style={[styles.loanName, { color: colors.textSecondary }]}>{emiDetails.loanName}</Text>
           ) : null}
 
-          {!emiDetails.matched ? (
+          {!emiDetails?.matched ? (
             <Text style={[styles.unmatched, { color: colors.textSecondary }]}>
-              {emiDetails.unmatchedMessage ??
-                "We couldn't link this EMI to a loan. Add the loan name in notes or match the EMI amount."}
+              {emiDetails?.unmatchedMessage ?? "Linked loan not found."}
             </Text>
           ) : (
             <>

@@ -24,6 +24,8 @@ export interface Expense {
   nextOccurrenceDate?: string | null;
   parentId?: number | null;
   recurrenceLabel?: string;
+  recurrenceStartDate?: string;
+  recurrenceEndDate?: string;
   totalPlannedCost?: number;
   emiDetails?: EmiDetails;
   createdAt: string;

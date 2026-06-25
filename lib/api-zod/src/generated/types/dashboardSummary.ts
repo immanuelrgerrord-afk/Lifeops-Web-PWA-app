@@ -8,6 +8,8 @@
 import type { CategorySummary } from './categorySummary';
 import type { Expense } from './expense';
 import type { Income } from './income';
+import type { LoanDashboardSummary } from './loanDashboardSummary';
+import type { MonthlyFixedCommitments } from './monthlyFixedCommitments';
 import type { UpcomingRecurring } from './upcomingRecurring';
 import type { UpcomingRecurringItem } from './upcomingRecurringItem';
 
@@ -18,6 +20,8 @@ export interface DashboardSummary {
   activeLoans: number;
   totalOutstanding: number;
   emiDueThisMonth: number;
+  totalRemainingInterest: number;
+  avgLoanCompletion: number;
   goalsCount: number;
   avgGoalProgress: number;
   monthlyIncomes: Income[];
@@ -27,4 +31,6 @@ export interface DashboardSummary {
   upcomingRecurringExpenses?: UpcomingRecurringItem[];
   topSpendingCategories: CategorySummary[];
   topIncomeCategories: CategorySummary[];
+  loanSummary: LoanDashboardSummary;
+  monthlyFixedCommitments: MonthlyFixedCommitments;
 }

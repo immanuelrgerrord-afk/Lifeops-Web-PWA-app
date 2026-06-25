@@ -2,10 +2,9 @@ import { Feather } from "@expo/vector-icons";
 import {
   useCreateLoan,
   useUpdateLoan,
-  getGetLoansQueryKey,
-  getGetDashboardQueryKey,
   type Loan,
 } from "@workspace/api-client-react";
+import { invalidateFinancialData } from "@/utils/queryInvalidation";
 import { useQueryClient } from "@tanstack/react-query";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -164,8 +163,7 @@ export function AddLoanModal({ visible, onClose, editing }: Props) {
   const createMutation = useCreateLoan({
     mutation: {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getGetLoansQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        invalidateFinancialData(qc);
         onClose();
       },
     },
@@ -174,8 +172,7 @@ export function AddLoanModal({ visible, onClose, editing }: Props) {
   const updateMutation = useUpdateLoan({
     mutation: {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getGetLoansQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        invalidateFinancialData(qc);
         onClose();
       },
     },

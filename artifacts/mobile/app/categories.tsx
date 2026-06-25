@@ -4,12 +4,9 @@ import {
   useCreateCategory,
   useUpdateCategory,
   useDeleteCategory,
-  getGetCategoriesQueryKey,
-  getGetIncomesQueryKey,
-  getGetExpensesQueryKey,
-  getGetDashboardQueryKey,
   type Category,
 } from "@workspace/api-client-react";
+import { invalidateFinancialData } from "@/utils/queryInvalidation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -191,10 +188,7 @@ export default function CategoriesScreen() {
   });
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: getGetCategoriesQueryKey() });
-    qc.invalidateQueries({ queryKey: getGetIncomesQueryKey() });
-    qc.invalidateQueries({ queryKey: getGetExpensesQueryKey() });
-    qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+    invalidateFinancialData(qc);
     refetch();
   };
 
@@ -261,8 +255,6 @@ export default function CategoriesScreen() {
       }
       setReassigning(null);
       invalidate();
-      qc.invalidateQueries({ queryKey: getGetIncomesQueryKey() });
-      qc.invalidateQueries({ queryKey: getGetExpensesQueryKey() });
     } catch (e: unknown) {
       Alert.alert("Error", e instanceof Error ? e.message : "Could not reassign category.");
     }

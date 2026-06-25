@@ -6,23 +6,10 @@ import { getOwnedCategory } from "../lib/categories.js";
 import { isValidRecurrenceType, nextOccurrenceDate } from "../lib/recurrence.js";
 import { syncRecurringForUser } from "../lib/recurringSync.js";
 import { formatLoanMetrics } from "../lib/loanCalculations.js";
+import { findMatchingLoan } from "../lib/emiMatching.js";
 import { buildTemplateMap, resolveRecurrenceDisplay } from "../lib/transactionFormat.js";
 
 const router = Router();
-
-function findMatchingLoan(
-  loanRows: (typeof loans.$inferSelect)[],
-  amount: number,
-  notes?: string | null,
-) {
-  if (notes?.trim()) {
-    const byName = loanRows.find((l) =>
-      notes.toLowerCase().includes(l.name.toLowerCase()),
-    );
-    if (byName) return byName;
-  }
-  return loanRows.find((l) => Math.abs(Number(l.emi) - amount) < 0.01) ?? null;
-}
 
 function buildEmiDetails(
   amount: number,
@@ -50,8 +37,7 @@ function buildEmiDetails(
     matched: false,
     loanName: notes?.trim() || undefined,
     emiAmount: amount,
-    unmatchedMessage:
-      "We couldn't link this EMI to a loan. Add the loan name in notes or match the EMI amount to an active loan.",
+    unmatchedMessage: "Linked loan not found.",
   };
 }
 
@@ -88,6 +74,8 @@ function formatExpense(
     nextOccurrenceDate: r.nextOccurrenceDate,
     parentId: r.parentId,
     recurrenceLabel: recurrence.recurrenceLabel,
+    recurrenceStartDate: recurrence.recurrenceStartDate,
+    recurrenceEndDate: recurrence.recurrenceEndDate,
     totalPlannedCost: recurrence.totalPlannedCost,
     isMaterializedOccurrence: recurrence.isMaterializedOccurrence,
     templateId: recurrence.templateId,
@@ -122,6 +110,7 @@ async function loadExpenseTemplates(userId: number) {
     .select({
       id: expenses.id,
       amount: expenses.amount,
+      date: expenses.date,
       recurrenceType: expenses.recurrenceType,
       occurrences: expenses.occurrences,
     })

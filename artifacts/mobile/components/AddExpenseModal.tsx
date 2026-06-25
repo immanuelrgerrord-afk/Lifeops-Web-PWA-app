@@ -3,10 +3,9 @@ import {
   useCreateExpense,
   useGetCategories,
   useUpdateExpense,
-  getGetExpensesQueryKey,
-  getGetDashboardQueryKey,
   type Expense,
 } from "@workspace/api-client-react";
+import { invalidateFinancialData } from "@/utils/queryInvalidation";
 import { useQueryClient } from "@tanstack/react-query";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -98,8 +97,7 @@ export function AddExpenseModal({ visible, onClose, editing }: Props) {
   const createMutation = useCreateExpense({
     mutation: {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getGetExpensesQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        invalidateFinancialData(qc);
         onClose();
       },
     },
@@ -108,8 +106,7 @@ export function AddExpenseModal({ visible, onClose, editing }: Props) {
   const updateMutation = useUpdateExpense({
     mutation: {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getGetExpensesQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        invalidateFinancialData(qc);
         onClose();
       },
     },

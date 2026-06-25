@@ -41,6 +41,8 @@ function formatIncome(
     nextOccurrenceDate: r.nextOccurrenceDate,
     parentId: r.parentId,
     recurrenceLabel: recurrence.recurrenceLabel,
+    recurrenceStartDate: recurrence.recurrenceStartDate,
+    recurrenceEndDate: recurrence.recurrenceEndDate,
     totalPlannedCost: recurrence.totalPlannedCost,
     isMaterializedOccurrence: recurrence.isMaterializedOccurrence,
     templateId: recurrence.templateId,
@@ -68,6 +70,7 @@ async function loadIncomeTemplates(userId: number) {
     .select({
       id: incomes.id,
       amount: incomes.amount,
+      date: incomes.date,
       recurrenceType: incomes.recurrenceType,
       occurrences: incomes.occurrences,
     })

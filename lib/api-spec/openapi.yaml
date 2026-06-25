@@ -727,6 +727,10 @@ components:
           nullable: true
         recurrenceLabel:
           type: string
+        recurrenceStartDate:
+          type: string
+        recurrenceEndDate:
+          type: string
         totalPlannedCost:
           type: number
         createdAt:
@@ -788,6 +792,10 @@ components:
           type: integer
           nullable: true
         recurrenceLabel:
+          type: string
+        recurrenceStartDate:
+          type: string
+        recurrenceEndDate:
           type: string
         totalPlannedCost:
           type: number
@@ -990,7 +998,88 @@ components:
           type: string
         nextDate:
           type: string
+        occurrences:
+          type: integer
+        recurrenceLabel:
+          type: string
+        totalPlannedCost:
+          type: number
+        startDate:
+          type: string
+        endDate:
+          type: string
       required: [id, categoryName, amount, recurrenceType, nextDate]
+
+    MonthlyFixedCommitment:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        categoryName:
+          type: string
+        categoryIcon:
+          type: string
+        categoryColor:
+          type: string
+        monthlyAmount:
+          type: number
+        source:
+          type: string
+          enum: [loan, expense]
+      required: [id, name, categoryName, monthlyAmount, source]
+
+    MonthlyFixedCommitments:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyFixedCommitment"
+        totalMonthlyCommitment:
+          type: number
+      required: [items, totalMonthlyCommitment]
+
+    LoanDashboardItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        emi:
+          type: number
+        emiDueThisMonth:
+          type: number
+        outstandingBalance:
+          type: number
+        remainingInterest:
+          type: number
+        completionPercentage:
+          type: number
+        isActive:
+          type: boolean
+      required: [id, name, emi, emiDueThisMonth, outstandingBalance, remainingInterest, completionPercentage, isActive]
+
+    LoanDashboardSummary:
+      type: object
+      properties:
+        activeLoans:
+          type: integer
+        totalOutstanding:
+          type: number
+        totalRemainingInterest:
+          type: number
+        emiDueThisMonth:
+          type: number
+        avgLoanCompletion:
+          type: number
+        loans:
+          type: array
+          items:
+            $ref: "#/components/schemas/LoanDashboardItem"
+      required: [activeLoans, totalOutstanding, totalRemainingInterest, emiDueThisMonth, avgLoanCompletion, loans]
 
     CategorySummary:
       type: object
@@ -1021,6 +1110,10 @@ components:
         totalOutstanding:
           type: number
         emiDueThisMonth:
+          type: number
+        totalRemainingInterest:
+          type: number
+        avgLoanCompletion:
           type: number
         goalsCount:
           type: integer
@@ -1054,4 +1147,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CategorySummary"
-      required: [totalIncome, totalExpenses, savings, activeLoans, totalOutstanding, emiDueThisMonth, goalsCount, avgGoalProgress, monthlyIncomes, monthlyExpenses, upcomingRecurring, topSpendingCategories, topIncomeCategories]
+        loanSummary:
+          $ref: "#/components/schemas/LoanDashboardSummary"
+        monthlyFixedCommitments:
+          $ref: "#/components/schemas/MonthlyFixedCommitments"
+      required: [totalIncome, totalExpenses, savings, activeLoans, totalOutstanding, emiDueThisMonth, totalRemainingInterest, avgLoanCompletion, goalsCount, avgGoalProgress, monthlyIncomes, monthlyExpenses, upcomingRecurring, topSpendingCategories, topIncomeCategories, loanSummary, monthlyFixedCommitments]

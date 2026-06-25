@@ -23,6 +23,8 @@ export interface Income {
   nextOccurrenceDate?: string | null;
   parentId?: number | null;
   recurrenceLabel?: string;
+  recurrenceStartDate?: string;
+  recurrenceEndDate?: string;
   totalPlannedCost?: number;
   createdAt: string;
   updatedAt: string;

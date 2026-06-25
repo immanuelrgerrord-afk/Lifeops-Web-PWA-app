@@ -1,11 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import {
-  useDeleteLoan,
-  useGetLoans,
-  getGetLoansQueryKey,
-  getGetDashboardQueryKey,
-  type Loan,
-} from "@workspace/api-client-react";
+import { useDeleteLoan, useGetLoans, type Loan } from "@workspace/api-client-react";
+import { invalidateFinancialData } from "@/utils/queryInvalidation";
 import { useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
 import {
@@ -35,10 +30,7 @@ export default function LoansScreen() {
 
   const deleteMutation = useDeleteLoan({
     mutation: {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getGetLoansQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
-      },
+      onSuccess: () => invalidateFinancialData(qc),
     },
   });
 
