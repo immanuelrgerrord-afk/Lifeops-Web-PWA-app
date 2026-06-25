@@ -21,6 +21,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AddExpenseModal } from "@/components/AddExpenseModal";
 import { ExpenseCard } from "@/components/ExpenseCard";
+import type { ComponentProps } from "react";
+
+type ExpenseCardProps = ComponentProps<typeof ExpenseCard>;
 import { useColors } from "@/hooks/useColors";
 
 function currentMonth() {
@@ -122,7 +125,13 @@ export default function ExpensesScreen() {
         scrollEnabled={!!expenses.length}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        renderItem={({ item }) => (
+        renderItem={({ item }) => {
+          const ext = item as Expense & {
+            emiDetails?: ExpenseCardProps["emiDetails"];
+            recurrenceLabel?: string;
+            totalPlannedCost?: number;
+          };
+          return (
           <ExpenseCard
             id={item.id}
             categoryName={item.categoryName ?? ""}
@@ -131,10 +140,13 @@ export default function ExpensesScreen() {
             notes={item.notes}
             recurrenceType={item.recurrenceType ?? "one-time"}
             occurrences={item.occurrences ?? 1}
+            recurrenceLabel={ext.recurrenceLabel}
+            totalPlannedCost={ext.totalPlannedCost}
+            emiDetails={ext.emiDetails}
             onEdit={() => { setEditing(item); setModalVisible(true); }}
             onDelete={() => handleDelete(item.id)}
           />
-        )}
+        );}}
         ListEmptyComponent={
           !isLoading ? (
             <View style={styles.empty}>

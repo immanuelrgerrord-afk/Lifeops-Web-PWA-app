@@ -3,6 +3,7 @@ import {
   useDeleteLoan,
   useGetLoans,
   getGetLoansQueryKey,
+  getGetDashboardQueryKey,
   type Loan,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -34,12 +35,16 @@ export default function LoansScreen() {
 
   const deleteMutation = useDeleteLoan({
     mutation: {
-      onSuccess: () => qc.invalidateQueries({ queryKey: getGetLoansQueryKey() }),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getGetLoansQueryKey() });
+        qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+      },
     },
   });
 
-  const totalOutstanding = loans.reduce((s, l) => s + l.outstandingBalance, 0);
-  const totalEmi = loans.reduce((s, l) => s + l.emi, 0);
+  const activeLoans = loans.filter((l) => (l.monthsRemaining ?? 0) > 0);
+  const totalOutstanding = activeLoans.reduce((s, l) => s + l.outstandingBalance, 0);
+  const totalEmi = activeLoans.reduce((s, l) => s + l.emi, 0);
 
   const handleDelete = (id: number) => {
     Alert.alert("Delete Loan", "This will remove this loan permanently.", [
@@ -67,9 +72,9 @@ export default function LoansScreen() {
         ]}
       >
         <Text style={[styles.title, { color: colors.text }]}>Loans</Text>
-        {loans.length > 0 && (
+        {activeLoans.length > 0 && (
           <View style={[styles.badge, { backgroundColor: colors.loan + "20" }]}>
-            <Text style={[styles.badgeText, { color: colors.loan }]}>{loans.length} active</Text>
+            <Text style={[styles.badgeText, { color: colors.loan }]}>{activeLoans.length} active</Text>
           </View>
         )}
       </View>

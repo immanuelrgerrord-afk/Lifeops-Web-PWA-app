@@ -9,6 +9,9 @@ interface TransactionItemProps {
   date: string;
   notes?: string | null;
   type: "income" | "expense";
+  recurrenceType?: string;
+  recurrenceLabel?: string;
+  totalPlannedCost?: number;
   onEdit?: () => void;
   onDelete?: () => void;
 }
@@ -35,7 +38,18 @@ function displayLabel(categoryName: string, notes?: string | null): string {
   return categoryName;
 }
 
-export function TransactionItem({ categoryName, amount, date, notes, type, onEdit, onDelete }: TransactionItemProps) {
+export function TransactionItem({
+  categoryName,
+  amount,
+  date,
+  notes,
+  type,
+  recurrenceType,
+  recurrenceLabel,
+  totalPlannedCost,
+  onEdit,
+  onDelete,
+}: TransactionItemProps) {
   const colors = useColors();
   const isIncome = type === "income";
   const accentColor = isIncome ? colors.income : colors.expense;
@@ -59,7 +73,16 @@ export function TransactionItem({ categoryName, amount, date, notes, type, onEdi
         {notes && label === categoryName ? (
           <Text style={[styles.notes, { color: colors.textSecondary }]}>{notes}</Text>
         ) : null}
-        <Text style={[styles.date, { color: colors.textSecondary }]}>{formatDate(date)}</Text>
+        {recurrenceType && recurrenceType !== "one-time" ? (
+          <Text style={[styles.recurrence, { color: colors.textSecondary }]}>
+            {recurrenceLabel ?? recurrenceType} · Total {formatAmount(totalPlannedCost ?? amount)}
+          </Text>
+        ) : (
+          <Text style={[styles.date, { color: colors.textSecondary }]}>{formatDate(date)}</Text>
+        )}
+        {recurrenceType && recurrenceType !== "one-time" ? (
+          <Text style={[styles.date, { color: colors.textSecondary }]}>{formatDate(date)}</Text>
+        ) : null}
       </View>
       <View style={styles.right}>
         <Text style={[styles.amount, { color: accentColor }]}>
@@ -118,6 +141,10 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
+  },
+  recurrence: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
   },
   right: {
     alignItems: "flex-end",

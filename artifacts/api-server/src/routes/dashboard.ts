@@ -1,91 +1,65 @@
 import { Router } from "express";
 import { db, incomes, expenses, loans, goals, categories } from "@workspace/db";
-import { eq, and, like, sum } from "drizzle-orm";
+import { eq, and, like, sum, ne, isNull, or, isNotNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
+import { emiAmountForMonth, formatLoanMetrics } from "../lib/loanCalculations.js";
+import { upcomingOccurrences, recurrenceLabel } from "../lib/recurrence.js";
+import { syncRecurringForUser } from "../lib/recurringSync.js";
 
 const router = Router();
-
-function calcEMI(principal: number, annualRate: number, tenureYears: number): number {
-  const n = tenureYears * 12;
-  if (annualRate === 0) return Math.round((principal / n) * 100) / 100;
-  const r = annualRate / 100 / 12;
-  return (principal * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
-}
-
-function monthsBetween(startDate: string): number {
-  const start = new Date(startDate + "T00:00:00");
-  const today = new Date();
-  return Math.max(0,
-    (today.getFullYear() - start.getFullYear()) * 12 +
-    (today.getMonth() - start.getMonth())
-  );
-}
-
-// Given a start date and recurrence type, compute the next occurrence after a given date
-function nextOccurrence(startDate: string, recurrenceType: string): string {
-  const start = new Date(startDate + "T00:00:00");
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  if (recurrenceType === "one-time") return startDate;
-
-  const intervalMonths: Record<string, number> = {
-    monthly: 1,
-    quarterly: 3,
-    "half-yearly": 6,
-    yearly: 12,
-  };
-  const interval = intervalMonths[recurrenceType] ?? 1;
-
-  let next = new Date(start);
-  while (next <= today) {
-    next.setMonth(next.getMonth() + interval);
-  }
-  return next.toISOString().split("T")[0];
-}
 
 router.get("/dashboard", requireAuth, async (req, res) => {
   const userId = req.userId!;
   const now = new Date();
-  const month = (req.query.month as string) ||
+  const month =
+    (req.query.month as string) ||
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  await syncRecurringForUser(userId);
 
   const [incomeSum] = await db
     .select({ total: sum(incomes.amount) })
     .from(incomes)
-    .where(and(eq(incomes.userId, userId), like(incomes.date, `${month}%`)));
+    .where(
+      and(
+        eq(incomes.userId, userId),
+        like(incomes.date, `${month}%`),
+        or(isNotNull(incomes.parentId), eq(incomes.recurrenceType, "one-time")),
+      ),
+    );
 
-  const [expenseSum] = await db
+  const [expenseSumRegular] = await db
     .select({ total: sum(expenses.amount) })
     .from(expenses)
-    .where(and(eq(expenses.userId, userId), like(expenses.date, `${month}%`)));
+    .leftJoin(categories, and(eq(expenses.categoryId, categories.id), eq(categories.userId, userId)))
+    .where(
+      and(
+        eq(expenses.userId, userId),
+        like(expenses.date, `${month}%`),
+        or(isNotNull(expenses.parentId), eq(expenses.recurrenceType, "one-time")),
+        or(ne(categories.name, "EMI"), isNull(categories.name)),
+      ),
+    );
 
   const loanRows = await db.select().from(loans).where(eq(loans.userId, userId));
   const goalRows = await db.select().from(goals).where(eq(goals.userId, userId));
 
   const totalIncome = Number(incomeSum?.total ?? 0);
-  const totalExpenses = Number(expenseSum?.total ?? 0);
+  const totalExpenses = Number(expenseSumRegular?.total ?? 0);
 
-  // EMI due this month = sum of all active loans' EMIs
-  const emiDueThisMonth = loanRows.reduce((s, l) => {
-    const elapsed = monthsBetween(l.startDate);
-    const totalMonths = l.tenureYears * 12;
-    if (elapsed < totalMonths) return s + Number(l.emi);
-    return s;
+  const emiDueThisMonth = loanRows.reduce(
+    (s, l) => s + emiAmountForMonth(l, month, now),
+    0,
+  );
+
+  const totalOutstanding = loanRows.reduce((acc, l) => {
+    const metrics = formatLoanMetrics(l);
+    if (metrics.isCompleted) return acc;
+    return acc + metrics.outstandingBalance;
   }, 0);
 
-  const totalOutstanding = loanRows.reduce((l_acc, l) => {
-    const principal = Number(l.principalAmount);
-    const rate = Number(l.interestRate);
-    const emi = Number(l.emi);
-    const elapsed = Math.min(monthsBetween(l.startDate), l.tenureYears * 12);
-    if (rate === 0) return l_acc + Math.max(0, principal - emi * elapsed);
-    const r = rate / 100 / 12;
-    const outstanding = principal * Math.pow(1 + r, elapsed) - emi * (Math.pow(1 + r, elapsed) - 1) / r;
-    return l_acc + Math.max(0, outstanding);
-  }, 0);
+  const activeLoans = loanRows.filter((l) => !formatLoanMetrics(l).isCompleted).length;
 
-  // Net savings = income - expenses - active EMI commitments
   const savings = totalIncome - totalExpenses - emiDueThisMonth;
 
   const avgGoalProgress =
@@ -97,8 +71,7 @@ router.get("/dashboard", requireAuth, async (req, res) => {
         }, 0) / goalRows.length
       : 0;
 
-  // Upcoming recurring for next 30 days
-  const allIncomes = await db
+  const incomeTemplates = await db
     .select({
       id: incomes.id,
       categoryName: categories.name,
@@ -106,12 +79,14 @@ router.get("/dashboard", requireAuth, async (req, res) => {
       date: incomes.date,
       recurrenceType: incomes.recurrenceType,
       occurrences: incomes.occurrences,
+      generatedOccurrences: incomes.generatedOccurrences,
+      notes: incomes.notes,
     })
     .from(incomes)
     .leftJoin(categories, and(eq(incomes.categoryId, categories.id), eq(categories.userId, userId)))
-    .where(and(eq(incomes.userId, userId)));
+    .where(and(eq(incomes.userId, userId), isNull(incomes.parentId), ne(incomes.recurrenceType, "one-time")));
 
-  const allExpenses = await db
+  const expenseTemplates = await db
     .select({
       id: expenses.id,
       categoryName: categories.name,
@@ -119,52 +94,68 @@ router.get("/dashboard", requireAuth, async (req, res) => {
       date: expenses.date,
       recurrenceType: expenses.recurrenceType,
       occurrences: expenses.occurrences,
+      generatedOccurrences: expenses.generatedOccurrences,
+      notes: expenses.notes,
     })
     .from(expenses)
     .leftJoin(categories, and(eq(expenses.categoryId, categories.id), eq(categories.userId, userId)))
-    .where(and(eq(expenses.userId, userId)));
+    .where(and(eq(expenses.userId, userId), isNull(expenses.parentId), ne(expenses.recurrenceType, "one-time")));
 
-  const upcoming30 = new Date();
-  upcoming30.setDate(upcoming30.getDate() + 30);
-
-  const upcomingRecurring: Array<{
-    id: number; type: string; categoryName: string; amount: number;
-    recurrenceType: string; nextDate: string;
+  const upcomingRecurringIncome: Array<{
+    id: number; categoryName: string; amount: number; recurrenceType: string; nextDate: string;
   }> = [];
 
-  for (const inc of allIncomes) {
-    if (inc.recurrenceType === "one-time") continue;
-    const next = nextOccurrence(inc.date, inc.recurrenceType);
-    const nextDt = new Date(next + "T00:00:00");
-    if (nextDt <= upcoming30) {
-      upcomingRecurring.push({
+  const upcomingRecurringExpenses: Array<{
+    id: number; categoryName: string; amount: number; recurrenceType: string; nextDate: string;
+  }> = [];
+
+  for (const inc of incomeTemplates) {
+    const upcoming = upcomingOccurrences(
+      inc.date,
+      inc.recurrenceType,
+      inc.occurrences,
+      inc.generatedOccurrences,
+    );
+    for (const u of upcoming) {
+      const displayName =
+        inc.categoryName === "Other" && inc.notes?.trim() ? inc.notes.trim() : (inc.categoryName ?? "");
+      upcomingRecurringIncome.push({
         id: inc.id,
-        type: "income",
-        categoryName: inc.categoryName ?? "",
+        categoryName: displayName,
         amount: Number(inc.amount),
         recurrenceType: inc.recurrenceType,
-        nextDate: next,
+        nextDate: u.date,
       });
     }
   }
 
-  for (const exp of allExpenses) {
-    if (exp.recurrenceType === "one-time") continue;
-    const next = nextOccurrence(exp.date, exp.recurrenceType);
-    const nextDt = new Date(next + "T00:00:00");
-    if (nextDt <= upcoming30) {
-      upcomingRecurring.push({
+  for (const exp of expenseTemplates) {
+    const upcoming = upcomingOccurrences(
+      exp.date,
+      exp.recurrenceType,
+      exp.occurrences,
+      exp.generatedOccurrences,
+    );
+    for (const u of upcoming) {
+      const displayName =
+        exp.categoryName === "Other" && exp.notes?.trim() ? exp.notes.trim() : (exp.categoryName ?? "");
+      upcomingRecurringExpenses.push({
         id: exp.id,
-        type: "expense",
-        categoryName: exp.categoryName ?? "",
+        categoryName: displayName,
         amount: Number(exp.amount),
         recurrenceType: exp.recurrenceType,
-        nextDate: next,
+        nextDate: u.date,
       });
     }
   }
 
-  upcomingRecurring.sort((a, b) => a.nextDate.localeCompare(b.nextDate));
+  upcomingRecurringIncome.sort((a, b) => a.nextDate.localeCompare(b.nextDate));
+  upcomingRecurringExpenses.sort((a, b) => a.nextDate.localeCompare(b.nextDate));
+
+  const upcomingRecurring = [
+    ...upcomingRecurringIncome.map((i) => ({ ...i, type: "income" as const })),
+    ...upcomingRecurringExpenses.map((e) => ({ ...e, type: "expense" as const })),
+  ].sort((a, b) => a.nextDate.localeCompare(b.nextDate));
 
   const monthlyIncomeRows = await db
     .select({
@@ -177,6 +168,9 @@ router.get("/dashboard", requireAuth, async (req, res) => {
       notes: incomes.notes,
       recurrenceType: incomes.recurrenceType,
       occurrences: incomes.occurrences,
+      generatedOccurrences: incomes.generatedOccurrences,
+      nextOccurrenceDate: incomes.nextOccurrenceDate,
+      parentId: incomes.parentId,
       createdAt: incomes.createdAt,
       updatedAt: incomes.updatedAt,
     })
@@ -196,6 +190,9 @@ router.get("/dashboard", requireAuth, async (req, res) => {
       notes: expenses.notes,
       recurrenceType: expenses.recurrenceType,
       occurrences: expenses.occurrences,
+      generatedOccurrences: expenses.generatedOccurrences,
+      nextOccurrenceDate: expenses.nextOccurrenceDate,
+      parentId: expenses.parentId,
       createdAt: expenses.createdAt,
       updatedAt: expenses.updatedAt,
     })
@@ -204,34 +201,35 @@ router.get("/dashboard", requireAuth, async (req, res) => {
     .where(and(eq(expenses.userId, userId), like(expenses.date, `${month}%`)))
     .orderBy(expenses.date);
 
+  const mapTx = (r: {
+    id: number; userId: number; categoryId: number; categoryName: string | null;
+    amount: string; date: string; notes: string | null; recurrenceType: string;
+    occurrences: number; generatedOccurrences: number; nextOccurrenceDate: string | null;
+    parentId: number | null; createdAt: Date; updatedAt: Date;
+  }) => ({
+    ...r,
+    amount: Number(r.amount),
+    categoryName: r.categoryName ?? "",
+    notes: r.notes ?? undefined,
+    recurrenceLabel: recurrenceLabel(r.recurrenceType),
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+  });
+
   return res.json({
     totalIncome,
     totalExpenses,
-    savings,
-    activeLoans: loanRows.length,
+    savings: Math.round(savings * 100) / 100,
+    activeLoans,
     totalOutstanding: Math.round(totalOutstanding * 100) / 100,
     emiDueThisMonth: Math.round(emiDueThisMonth * 100) / 100,
     goalsCount: goalRows.length,
     avgGoalProgress: Math.round(avgGoalProgress * 10) / 10,
-    monthlyIncomes: monthlyIncomeRows.map((r) => ({
-      ...r,
-      amount: Number(r.amount),
-      categoryName: r.categoryName ?? "",
-      recurrenceType: r.recurrenceType,
-      occurrences: r.occurrences,
-      createdAt: r.createdAt.toISOString(),
-      updatedAt: r.updatedAt.toISOString(),
-    })),
-    monthlyExpenses: monthlyExpenseRows.map((r) => ({
-      ...r,
-      amount: Number(r.amount),
-      categoryName: r.categoryName ?? "",
-      recurrenceType: r.recurrenceType,
-      occurrences: r.occurrences,
-      createdAt: r.createdAt.toISOString(),
-      updatedAt: r.updatedAt.toISOString(),
-    })),
+    monthlyIncomes: monthlyIncomeRows.map(mapTx),
+    monthlyExpenses: monthlyExpenseRows.map(mapTx),
     upcomingRecurring,
+    upcomingRecurringIncome,
+    upcomingRecurringExpenses,
   });
 });
 

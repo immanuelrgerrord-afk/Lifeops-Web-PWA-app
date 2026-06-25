@@ -8,6 +8,7 @@
 import type { Expense } from './expense';
 import type { Income } from './income';
 import type { UpcomingRecurring } from './upcomingRecurring';
+import type { UpcomingRecurringItem } from './upcomingRecurringItem';
 
 export interface DashboardSummary {
   totalIncome: number;
@@ -21,4 +22,6 @@ export interface DashboardSummary {
   monthlyIncomes: Income[];
   monthlyExpenses: Expense[];
   upcomingRecurring: UpcomingRecurring[];
+  upcomingRecurringIncome?: UpcomingRecurringItem[];
+  upcomingRecurringExpenses?: UpcomingRecurringItem[];
 }

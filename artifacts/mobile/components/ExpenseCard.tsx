@@ -3,6 +3,17 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
 
+interface EmiDetails {
+  emiStartDate: string;
+  emiDurationMonths: number;
+  monthsCompleted: number;
+  monthsRemaining: number;
+  totalPaid: number;
+  remainingAmount: number;
+  nextEmiDate: string | null;
+  completionPercentage: number;
+}
+
 interface ExpenseCardProps {
   id: number;
   categoryName: string;
@@ -11,6 +22,9 @@ interface ExpenseCardProps {
   notes?: string | null;
   recurrenceType: string;
   occurrences: number;
+  recurrenceLabel?: string;
+  totalPlannedCost?: number;
+  emiDetails?: EmiDetails;
   onEdit?: () => void;
   onDelete?: () => void;
 }
@@ -26,7 +40,9 @@ function fmtDate(d: string) {
       return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
     return d;
-  } catch { return d; }
+  } catch {
+    return d;
+  }
 }
 
 function recurrenceLabel(type: string): string {
@@ -40,26 +56,6 @@ function recurrenceLabel(type: string): string {
   return map[type] ?? type;
 }
 
-function totalPlanned(amount: number, recurrenceType: string, occurrences: number): number {
-  if (recurrenceType === "one-time") return amount;
-  return amount * occurrences;
-}
-
-function monthsElapsed(startDateStr: string): number {
-  const start = new Date(startDateStr + "T00:00:00");
-  const today = new Date();
-  return Math.max(0,
-    (today.getFullYear() - start.getFullYear()) * 12 +
-    (today.getMonth() - start.getMonth())
-  );
-}
-
-function addMonths(dateStr: string, months: number): string {
-  const d = new Date(dateStr + "T00:00:00");
-  d.setMonth(d.getMonth() + months);
-  return d.toISOString().split("T")[0];
-}
-
 export function ExpenseCard({
   categoryName,
   amount,
@@ -67,31 +63,24 @@ export function ExpenseCard({
   notes,
   recurrenceType,
   occurrences,
+  recurrenceLabel: recurrenceLabelProp,
+  totalPlannedCost,
+  emiDetails,
   onEdit,
   onDelete,
 }: ExpenseCardProps) {
   const colors = useColors();
 
-  // Smart category display: if "Other" and notes exist, use notes as label
   const displayName =
-    categoryName === "Other" && notes?.trim()
-      ? notes.trim()
-      : categoryName;
+    categoryName === "Other" && notes?.trim() ? notes.trim() : categoryName;
 
   const isEMI = categoryName === "EMI";
   const isRecurring = recurrenceType !== "one-time";
-  const planned = totalPlanned(amount, recurrenceType, occurrences);
-
-  // EMI calculations (only when category = EMI)
-  const monthsCompleted = isEMI ? Math.min(monthsElapsed(date), occurrences) : 0;
-  const monthsRemaining = isEMI ? Math.max(0, occurrences - monthsCompleted) : 0;
-  const totalPaid = isEMI ? amount * monthsCompleted : 0;
-  const remainingAmt = isEMI ? amount * monthsRemaining : 0;
-  const nextEMIDate = isEMI && monthsRemaining > 0 ? addMonths(date, monthsCompleted + 1) : null;
+  const planned = totalPlannedCost ?? (isRecurring ? amount * occurrences : amount);
+  const recLabel = recurrenceLabelProp ?? recurrenceLabel(recurrenceType);
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      {/* Main row */}
       <View style={styles.mainRow}>
         <View style={[styles.iconBox, { backgroundColor: colors.expense + "20" }]}>
           <Feather name="trending-down" size={16} color={colors.expense} />
@@ -100,15 +89,13 @@ export function ExpenseCard({
         <View style={styles.info}>
           <Text style={[styles.name, { color: colors.text }]}>{displayName}</Text>
 
-          {/* Show original category if smart-display changed it */}
           {displayName !== categoryName && (
             <Text style={[styles.catLabel, { color: colors.textSecondary }]}>{categoryName}</Text>
           )}
 
-          {/* Recurrence line */}
           {isRecurring ? (
             <Text style={[styles.recurrence, { color: colors.textSecondary }]}>
-              {recurrenceLabel(recurrenceType)} × {occurrences}
+              {recLabel} × {occurrences}
             </Text>
           ) : (
             <Text style={[styles.recurrence, { color: colors.textSecondary }]}>
@@ -134,7 +121,6 @@ export function ExpenseCard({
         </View>
       </View>
 
-      {/* Recurring total planned */}
       {isRecurring && (
         <View style={[styles.plannedRow, { borderTopColor: colors.border }]}>
           <Text style={[styles.plannedLabel, { color: colors.textSecondary }]}>Total Planned</Text>
@@ -142,40 +128,43 @@ export function ExpenseCard({
         </View>
       )}
 
-      {/* EMI details (only when category = EMI) */}
-      {isEMI && (
+      {isEMI && emiDetails && (
         <View style={[styles.emiBox, { backgroundColor: colors.expense + "08", borderColor: colors.expense + "25" }]}>
           <View style={styles.emiGrid}>
             <View style={styles.emiCell}>
               <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Started</Text>
-              <Text style={[styles.emiVal, { color: colors.text }]}>{fmtDate(date)}</Text>
+              <Text style={[styles.emiVal, { color: colors.text }]}>{fmtDate(emiDetails.emiStartDate)}</Text>
             </View>
             <View style={styles.emiCell}>
               <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Duration</Text>
-              <Text style={[styles.emiVal, { color: colors.text }]}>{occurrences} months</Text>
+              <Text style={[styles.emiVal, { color: colors.text }]}>{emiDetails.emiDurationMonths} months</Text>
             </View>
             <View style={styles.emiCell}>
               <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Completed</Text>
-              <Text style={[styles.emiVal, { color: colors.income }]}>{monthsCompleted}</Text>
+              <Text style={[styles.emiVal, { color: colors.income }]}>{emiDetails.monthsCompleted}</Text>
             </View>
             <View style={styles.emiCell}>
               <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Remaining</Text>
-              <Text style={[styles.emiVal, { color: colors.expense }]}>{monthsRemaining}</Text>
+              <Text style={[styles.emiVal, { color: colors.expense }]}>{emiDetails.monthsRemaining}</Text>
             </View>
             <View style={styles.emiCell}>
               <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Paid</Text>
-              <Text style={[styles.emiVal, { color: colors.income }]}>{fmtINR(totalPaid)}</Text>
+              <Text style={[styles.emiVal, { color: colors.income }]}>{fmtINR(emiDetails.totalPaid)}</Text>
             </View>
             <View style={styles.emiCell}>
               <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Left</Text>
-              <Text style={[styles.emiVal, { color: colors.expense }]}>{fmtINR(remainingAmt)}</Text>
+              <Text style={[styles.emiVal, { color: colors.expense }]}>{fmtINR(emiDetails.remainingAmount)}</Text>
             </View>
           </View>
-          {nextEMIDate && (
+          <View style={[styles.progressRow, { borderTopColor: colors.expense + "20" }]}>
+            <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Completion</Text>
+            <Text style={[styles.emiVal, { color: colors.text }]}>{emiDetails.completionPercentage}%</Text>
+          </View>
+          {emiDetails.nextEmiDate && (
             <View style={[styles.nextEMIRow, { borderTopColor: colors.expense + "20" }]}>
               <Feather name="calendar" size={12} color={colors.expense} />
               <Text style={[styles.nextEMIText, { color: colors.expense }]}>
-                Next EMI: {fmtDate(nextEMIDate)}
+                Next EMI: {fmtDate(emiDetails.nextEmiDate)}
               </Text>
             </View>
           )}
@@ -277,6 +266,13 @@ const styles = StyleSheet.create({
   emiVal: {
     fontSize: 13,
     fontFamily: "Inter_700Bold",
+  },
+  progressRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
   },
   nextEMIRow: {
     flexDirection: "row",

@@ -24,6 +24,9 @@ export interface Loan {
   monthsCompleted: number;
   monthsRemaining: number;
   totalMonths: number;
+  nextEmiDate?: string | null;
+  completionPercentage?: number;
+  isCompleted?: boolean;
   createdAt: string;
   updatedAt: string;
 }

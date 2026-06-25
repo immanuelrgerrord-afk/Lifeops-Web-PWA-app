@@ -13,7 +13,7 @@ ARG FRONTEND_ORIGIN
 ENV EXPO_PUBLIC_API_URL=${EXPO_PUBLIC_API_URL}
 ENV FRONTEND_ORIGIN=${FRONTEND_ORIGIN}
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json tsconfig.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc tsconfig.base.json tsconfig.json ./
 COPY lib/api-client-react ./lib/api-client-react
 COPY artifacts/mobile ./artifacts/mobile
 

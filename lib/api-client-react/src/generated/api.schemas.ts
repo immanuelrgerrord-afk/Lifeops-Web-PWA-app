@@ -79,6 +79,8 @@ export const CreateCategoryRequestType = {
 export interface CreateCategoryRequest {
   name: string;
   type: CreateCategoryRequestType;
+  icon?: string;
+  color?: string;
 }
 
 export interface UpdateCategoryRequest {
@@ -97,6 +99,12 @@ export interface Income {
   notes?: string;
   recurrenceType: string;
   occurrences: number;
+  occurrenceCount?: number;
+  generatedOccurrences?: number;
+  nextOccurrenceDate?: string | null;
+  parentId?: number | null;
+  recurrenceLabel?: string;
+  totalPlannedCost?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -110,6 +118,17 @@ export interface CreateIncomeRequest {
   occurrences?: number;
 }
 
+export interface EmiDetails {
+  emiStartDate: string;
+  emiDurationMonths: number;
+  monthsCompleted: number;
+  monthsRemaining: number;
+  totalPaid: number;
+  remainingAmount: number;
+  nextEmiDate?: string | null;
+  completionPercentage: number;
+}
+
 export interface Expense {
   id: number;
   userId: number;
@@ -120,6 +139,13 @@ export interface Expense {
   notes?: string;
   recurrenceType: string;
   occurrences: number;
+  occurrenceCount?: number;
+  generatedOccurrences?: number;
+  nextOccurrenceDate?: string | null;
+  parentId?: number | null;
+  recurrenceLabel?: string;
+  totalPlannedCost?: number;
+  emiDetails?: EmiDetails;
   createdAt: string;
   updatedAt: string;
 }
@@ -151,6 +177,9 @@ export interface Loan {
   monthsCompleted: number;
   monthsRemaining: number;
   totalMonths: number;
+  nextEmiDate?: string | null;
+  completionPercentage?: number;
+  isCompleted?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -201,6 +230,14 @@ export interface UpcomingRecurring {
   nextDate: string;
 }
 
+export interface UpcomingRecurringItem {
+  id: number;
+  categoryName: string;
+  amount: number;
+  recurrenceType: string;
+  nextDate: string;
+}
+
 export interface DashboardSummary {
   totalIncome: number;
   totalExpenses: number;
@@ -213,6 +250,8 @@ export interface DashboardSummary {
   monthlyIncomes: Income[];
   monthlyExpenses: Expense[];
   upcomingRecurring: UpcomingRecurring[];
+  upcomingRecurringIncome?: UpcomingRecurringItem[];
+  upcomingRecurringExpenses?: UpcomingRecurringItem[];
 }
 
 export type GetCategoriesParams = {

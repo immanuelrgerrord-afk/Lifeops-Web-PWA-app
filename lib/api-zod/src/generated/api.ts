@@ -118,7 +118,9 @@ export const GetCategoriesResponse = zod.array(GetCategoriesResponseItem)
  */
 export const CreateCategoryBody = zod.object({
   "name": zod.string(),
-  "type": zod.enum(['income', 'expense', 'loan', 'goal'])
+  "type": zod.enum(['income', 'expense', 'loan', 'goal']),
+  "icon": zod.string().optional(),
+  "color": zod.string().optional()
 })
 
 
@@ -177,6 +179,12 @@ export const GetIncomesResponseItem = zod.object({
   "notes": zod.string().optional(),
   "recurrenceType": zod.string(),
   "occurrences": zod.number(),
+  "occurrenceCount": zod.number().optional(),
+  "generatedOccurrences": zod.number().optional(),
+  "nextOccurrenceDate": zod.string().nullish(),
+  "parentId": zod.number().nullish(),
+  "recurrenceLabel": zod.string().optional(),
+  "totalPlannedCost": zod.number().optional(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -222,6 +230,12 @@ export const UpdateIncomeResponse = zod.object({
   "notes": zod.string().optional(),
   "recurrenceType": zod.string(),
   "occurrences": zod.number(),
+  "occurrenceCount": zod.number().optional(),
+  "generatedOccurrences": zod.number().optional(),
+  "nextOccurrenceDate": zod.string().nullish(),
+  "parentId": zod.number().nullish(),
+  "recurrenceLabel": zod.string().optional(),
+  "totalPlannedCost": zod.number().optional(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -256,6 +270,22 @@ export const GetExpensesResponseItem = zod.object({
   "notes": zod.string().optional(),
   "recurrenceType": zod.string(),
   "occurrences": zod.number(),
+  "occurrenceCount": zod.number().optional(),
+  "generatedOccurrences": zod.number().optional(),
+  "nextOccurrenceDate": zod.string().nullish(),
+  "parentId": zod.number().nullish(),
+  "recurrenceLabel": zod.string().optional(),
+  "totalPlannedCost": zod.number().optional(),
+  "emiDetails": zod.object({
+  "emiStartDate": zod.string(),
+  "emiDurationMonths": zod.number(),
+  "monthsCompleted": zod.number(),
+  "monthsRemaining": zod.number(),
+  "totalPaid": zod.number(),
+  "remainingAmount": zod.number(),
+  "nextEmiDate": zod.string().nullish(),
+  "completionPercentage": zod.number()
+}).optional(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -301,6 +331,22 @@ export const UpdateExpenseResponse = zod.object({
   "notes": zod.string().optional(),
   "recurrenceType": zod.string(),
   "occurrences": zod.number(),
+  "occurrenceCount": zod.number().optional(),
+  "generatedOccurrences": zod.number().optional(),
+  "nextOccurrenceDate": zod.string().nullish(),
+  "parentId": zod.number().nullish(),
+  "recurrenceLabel": zod.string().optional(),
+  "totalPlannedCost": zod.number().optional(),
+  "emiDetails": zod.object({
+  "emiStartDate": zod.string(),
+  "emiDurationMonths": zod.number(),
+  "monthsCompleted": zod.number(),
+  "monthsRemaining": zod.number(),
+  "totalPaid": zod.number(),
+  "remainingAmount": zod.number(),
+  "nextEmiDate": zod.string().nullish(),
+  "completionPercentage": zod.number()
+}).optional(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -339,6 +385,9 @@ export const GetLoansResponseItem = zod.object({
   "monthsCompleted": zod.number(),
   "monthsRemaining": zod.number(),
   "totalMonths": zod.number(),
+  "nextEmiDate": zod.string().nullish(),
+  "completionPercentage": zod.number().optional(),
+  "isCompleted": zod.boolean().optional(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -394,6 +443,9 @@ export const UpdateLoanResponse = zod.object({
   "monthsCompleted": zod.number(),
   "monthsRemaining": zod.number(),
   "totalMonths": zod.number(),
+  "nextEmiDate": zod.string().nullish(),
+  "completionPercentage": zod.number().optional(),
+  "isCompleted": zod.boolean().optional(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
@@ -504,6 +556,12 @@ export const GetDashboardResponse = zod.object({
   "notes": zod.string().optional(),
   "recurrenceType": zod.string(),
   "occurrences": zod.number(),
+  "occurrenceCount": zod.number().optional(),
+  "generatedOccurrences": zod.number().optional(),
+  "nextOccurrenceDate": zod.string().nullish(),
+  "parentId": zod.number().nullish(),
+  "recurrenceLabel": zod.string().optional(),
+  "totalPlannedCost": zod.number().optional(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })),
@@ -517,6 +575,22 @@ export const GetDashboardResponse = zod.object({
   "notes": zod.string().optional(),
   "recurrenceType": zod.string(),
   "occurrences": zod.number(),
+  "occurrenceCount": zod.number().optional(),
+  "generatedOccurrences": zod.number().optional(),
+  "nextOccurrenceDate": zod.string().nullish(),
+  "parentId": zod.number().nullish(),
+  "recurrenceLabel": zod.string().optional(),
+  "totalPlannedCost": zod.number().optional(),
+  "emiDetails": zod.object({
+  "emiStartDate": zod.string(),
+  "emiDurationMonths": zod.number(),
+  "monthsCompleted": zod.number(),
+  "monthsRemaining": zod.number(),
+  "totalPaid": zod.number(),
+  "remainingAmount": zod.number(),
+  "nextEmiDate": zod.string().nullish(),
+  "completionPercentage": zod.number()
+}).optional(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })),
@@ -527,7 +601,21 @@ export const GetDashboardResponse = zod.object({
   "amount": zod.number(),
   "recurrenceType": zod.string(),
   "nextDate": zod.string()
-}))
+})),
+  "upcomingRecurringIncome": zod.array(zod.object({
+  "id": zod.number(),
+  "categoryName": zod.string(),
+  "amount": zod.number(),
+  "recurrenceType": zod.string(),
+  "nextDate": zod.string()
+})).optional(),
+  "upcomingRecurringExpenses": zod.array(zod.object({
+  "id": zod.number(),
+  "categoryName": zod.string(),
+  "amount": zod.number(),
+  "recurrenceType": zod.string(),
+  "nextDate": zod.string()
+})).optional()
 })
 
 

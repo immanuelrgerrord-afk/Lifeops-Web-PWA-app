@@ -7,7 +7,7 @@ RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 WORKDIR /app
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json tsconfig.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc tsconfig.base.json tsconfig.json ./
 COPY lib ./lib
 COPY artifacts/api-server ./artifacts/api-server
 
@@ -28,8 +28,6 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=builder /prod ./
-
-WORKDIR /app/artifacts/api-server
 
 EXPOSE 3000
 

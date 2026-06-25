@@ -16,6 +16,12 @@ export interface Income {
   notes?: string;
   recurrenceType: string;
   occurrences: number;
+  occurrenceCount?: number;
+  generatedOccurrences?: number;
+  nextOccurrenceDate?: string | null;
+  parentId?: number | null;
+  recurrenceLabel?: string;
+  totalPlannedCost?: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -54,6 +54,9 @@ export const incomes = pgTable("incomes", {
   notes: text("notes"),
   recurrenceType: varchar("recurrence_type", { length: 20 }).default("one-time").notNull(),
   occurrences: integer("occurrences").default(1).notNull(),
+  nextOccurrenceDate: varchar("next_occurrence_date", { length: 10 }),
+  generatedOccurrences: integer("generated_occurrences").default(0).notNull(),
+  parentId: integer("parent_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -71,6 +74,9 @@ export const expenses = pgTable("expenses", {
   notes: text("notes"),
   recurrenceType: varchar("recurrence_type", { length: 20 }).default("one-time").notNull(),
   occurrences: integer("occurrences").default(1).notNull(),
+  nextOccurrenceDate: varchar("next_occurrence_date", { length: 10 }),
+  generatedOccurrences: integer("generated_occurrences").default(0).notNull(),
+  parentId: integer("parent_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

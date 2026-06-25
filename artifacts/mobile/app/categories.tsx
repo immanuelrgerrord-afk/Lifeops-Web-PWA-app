@@ -5,6 +5,8 @@ import {
   useUpdateCategory,
   useDeleteCategory,
   getGetCategoriesQueryKey,
+  getGetIncomesQueryKey,
+  getGetExpensesQueryKey,
   type Category,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -23,6 +25,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useAuth } from "@/context/AuthContext";
 
 type CategoryType = "income" | "expense" | "loan" | "goal";
 
@@ -215,10 +218,49 @@ export default function CategoriesScreen() {
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   const handleSave = (name: string, icon: string | null, color: string | null) => {
+    if (activeTab !== "income" && activeTab !== "expense") {
+      Alert.alert("Not Supported", "Custom categories are only available for income and expense.");
+      return;
+    }
     if (editingCat) {
       updateMutation.mutate({ id: editingCat.id, data: { name, icon: icon ?? undefined, color: color ?? undefined } });
     } else {
-      createMutation.mutate({ data: { name, type: activeTab } });
+      createMutation.mutate({
+        data: {
+          name,
+          type: activeTab as "income" | "expense",
+          icon: icon ?? undefined,
+          color: color ?? undefined,
+        },
+      });
+    }
+  };
+
+  const [reassigning, setReassigning] = useState<Category | null>(null);
+  const { token } = useAuth();
+
+  const reassignAndDelete = async (source: Category, targetId: number) => {
+    const baseUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/+$/, "");
+    if (!baseUrl || !token) return;
+    try {
+      const res = await fetch(`${baseUrl}/api/categories/${source.id}/reassign`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ targetCategoryId: targetId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message ?? "Reassign failed");
+      }
+      setReassigning(null);
+      invalidate();
+      qc.invalidateQueries({ queryKey: getGetIncomesQueryKey() });
+      qc.invalidateQueries({ queryKey: getGetExpensesQueryKey() });
+    } catch (e: unknown) {
+      Alert.alert("Error", e instanceof Error ? e.message : "Could not reassign category.");
     }
   };
 
@@ -229,7 +271,32 @@ export default function CategoriesScreen() {
     }
     Alert.alert("Delete Category", `Delete "${cat.name}"?`, [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate({ id: cat.id }) },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () =>
+          deleteMutation.mutate(
+            { id: cat.id },
+            {
+              onError: (err: unknown) => {
+                const data = (err as { response?: { data?: { code?: string; message?: string; transactionCount?: number } } })
+                  ?.response?.data;
+                if (data?.code === "CATEGORY_IN_USE") {
+                  Alert.alert(
+                    "Category In Use",
+                    data.message ?? "Move transactions to another category first.",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      { text: "Move Transactions", onPress: () => setReassigning(cat) },
+                    ],
+                  );
+                } else {
+                  Alert.alert("Error", data?.message ?? "Could not delete category.");
+                }
+              },
+            },
+          ),
+      },
     ]);
   };
 
@@ -282,7 +349,14 @@ export default function CategoriesScreen() {
 
       {/* Category list */}
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
-        {cats.length === 0 && (
+        {activeTab !== "income" && activeTab !== "expense" ? (
+          <View style={styles.empty}>
+            <Feather name="info" size={36} color={colors.textSecondary} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              Loan and goal labels are managed on their respective screens. Custom categories apply to income and expense only.
+            </Text>
+          </View>
+        ) : cats.length === 0 ? (
           <View style={styles.empty}>
             <Feather name="tag" size={36} color={colors.textSecondary} />
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No {activeTab} categories yet</Text>
@@ -293,8 +367,8 @@ export default function CategoriesScreen() {
               <Text style={styles.emptyBtnText}>Add First Category</Text>
             </Pressable>
           </View>
-        )}
-        {cats.map((cat) => (
+        ) : (
+          cats.map((cat) => (
           <View key={cat.id} style={[styles.catRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {/* Icon/color dot */}
             <View style={[styles.catIcon, { backgroundColor: (cat.color ?? accentColor) + "25" }]}>
@@ -331,8 +405,35 @@ export default function CategoriesScreen() {
               )}
             </View>
           </View>
-        ))}
+          ))
+        )}
       </ScrollView>
+
+      {reassigning && (
+        <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setReassigning(null)}>
+          <View style={[s.modalContainer, { backgroundColor: colors.background, paddingTop: insets.top + 16 }]}>
+            <Text style={[s.modalTitle, { color: colors.text, paddingHorizontal: 20, marginBottom: 12 }]}>
+              Move transactions from "{reassigning.name}"
+            </Text>
+            <ScrollView contentContainerStyle={{ padding: 20, gap: 8 }}>
+              {cats
+                .filter((c) => c.id !== reassigning.id && (c.type === reassigning.type))
+                .map((c) => (
+                  <Pressable
+                    key={c.id}
+                    onPress={() => reassignAndDelete(reassigning, c.id)}
+                    style={[styles.catRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  >
+                    <Text style={[styles.catName, { color: colors.text }]}>{c.name}</Text>
+                  </Pressable>
+                ))}
+            </ScrollView>
+            <Pressable onPress={() => setReassigning(null)} style={{ padding: 20 }}>
+              <Text style={{ color: colors.textSecondary, textAlign: "center" }}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Modal>
+      )}
 
       <EditModal
         visible={modalVisible}

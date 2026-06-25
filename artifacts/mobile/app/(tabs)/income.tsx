@@ -122,17 +122,22 @@ export default function IncomeScreen() {
         scrollEnabled={!!incomes.length}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        renderItem={({ item }) => (
+        renderItem={({ item }) => {
+          const ext = item as Income & { recurrenceLabel?: string; totalPlannedCost?: number };
+          return (
           <TransactionItem
             categoryName={item.categoryName ?? ""}
             amount={item.amount}
             date={item.date}
             notes={item.notes}
             type="income"
+            recurrenceType={item.recurrenceType}
+            recurrenceLabel={ext.recurrenceLabel}
+            totalPlannedCost={ext.totalPlannedCost}
             onEdit={() => { setEditing(item); setModalVisible(true); }}
             onDelete={() => handleDelete(item.id)}
           />
-        )}
+        );}}
         ListEmptyComponent={
           !isLoading ? (
             <View style={styles.empty}>

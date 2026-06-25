@@ -673,6 +673,10 @@ components:
         type:
           type: string
           enum: [income, expense, loan, goal]
+        icon:
+          type: string
+        color:
+          type: string
       required: [name, type]
 
     UpdateCategoryRequest:
@@ -707,6 +711,20 @@ components:
           type: string
         occurrences:
           type: integer
+        occurrenceCount:
+          type: integer
+        generatedOccurrences:
+          type: integer
+        nextOccurrenceDate:
+          type: string
+          nullable: true
+        parentId:
+          type: integer
+          nullable: true
+        recurrenceLabel:
+          type: string
+        totalPlannedCost:
+          type: number
         createdAt:
           type: string
         updatedAt:
@@ -751,11 +769,49 @@ components:
           type: string
         occurrences:
           type: integer
+        occurrenceCount:
+          type: integer
+        generatedOccurrences:
+          type: integer
+        nextOccurrenceDate:
+          type: string
+          nullable: true
+        parentId:
+          type: integer
+          nullable: true
+        recurrenceLabel:
+          type: string
+        totalPlannedCost:
+          type: number
+        emiDetails:
+          $ref: "#/components/schemas/EmiDetails"
         createdAt:
           type: string
         updatedAt:
           type: string
       required: [id, userId, categoryId, amount, date, recurrenceType, occurrences, createdAt, updatedAt]
+
+    EmiDetails:
+      type: object
+      properties:
+        emiStartDate:
+          type: string
+        emiDurationMonths:
+          type: integer
+        monthsCompleted:
+          type: integer
+        monthsRemaining:
+          type: integer
+        totalPaid:
+          type: number
+        remainingAmount:
+          type: number
+        nextEmiDate:
+          type: string
+          nullable: true
+        completionPercentage:
+          type: number
+      required: [emiStartDate, emiDurationMonths, monthsCompleted, monthsRemaining, totalPaid, remainingAmount, completionPercentage]
 
     CreateExpenseRequest:
       type: object
@@ -811,6 +867,13 @@ components:
           type: integer
         totalMonths:
           type: integer
+        nextEmiDate:
+          type: string
+          nullable: true
+        completionPercentage:
+          type: number
+        isCompleted:
+          type: boolean
         createdAt:
           type: string
         updatedAt:
@@ -890,6 +953,21 @@ components:
           type: string
       required: [id, type, categoryName, amount, recurrenceType, nextDate]
 
+    UpcomingRecurringItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        categoryName:
+          type: string
+        amount:
+          type: number
+        recurrenceType:
+          type: string
+        nextDate:
+          type: string
+      required: [id, categoryName, amount, recurrenceType, nextDate]
+
     DashboardSummary:
       type: object
       properties:
@@ -921,4 +999,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UpcomingRecurring"
+        upcomingRecurringIncome:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpcomingRecurringItem"
+        upcomingRecurringExpenses:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpcomingRecurringItem"
       required: [totalIncome, totalExpenses, savings, activeLoans, totalOutstanding, emiDueThisMonth, goalsCount, avgGoalProgress, monthlyIncomes, monthlyExpenses, upcomingRecurring]

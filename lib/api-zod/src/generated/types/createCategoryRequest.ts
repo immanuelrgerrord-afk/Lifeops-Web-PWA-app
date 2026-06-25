@@ -10,4 +10,6 @@ import type { CreateCategoryRequestType } from './createCategoryRequestType';
 export interface CreateCategoryRequest {
   name: string;
   type: CreateCategoryRequestType;
+  icon?: string;
+  color?: string;
 }

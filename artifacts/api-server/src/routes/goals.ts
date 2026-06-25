@@ -73,7 +73,11 @@ router.put("/goals/:id", requireAuth, async (req, res) => {
 
 router.delete("/goals/:id", requireAuth, async (req, res) => {
   const id = Number(req.params.id);
-  await db.delete(goals).where(and(eq(goals.id, id), eq(goals.userId, req.userId!)));
+  const [row] = await db
+    .delete(goals)
+    .where(and(eq(goals.id, id), eq(goals.userId, req.userId!)))
+    .returning({ id: goals.id });
+  if (!row) return res.status(404).json({ message: "Not found" });
   return res.json({ message: "Deleted" });
 });
 
