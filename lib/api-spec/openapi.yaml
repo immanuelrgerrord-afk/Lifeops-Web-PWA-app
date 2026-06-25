@@ -1,0 +1,924 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.3.0
+  description: LifeOps personal finance API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+  - name: auth
+  - name: categories
+  - name: incomes
+  - name: expenses
+  - name: loans
+  - name: goals
+  - name: dashboard
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "409":
+          description: Mobile already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with mobile and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout current user
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      summary: Change password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      tags: [auth]
+      summary: Request password reset (placeholder)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          description: Reset instructions sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /categories:
+    get:
+      operationId: getCategories
+      tags: [categories]
+      summary: Get all categories for user
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [income, expense]
+      responses:
+        "200":
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+    post:
+      operationId: createCategory
+      tags: [categories]
+      summary: Create a category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCategoryRequest"
+      responses:
+        "201":
+          description: Created category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+
+  /categories/{id}:
+    put:
+      operationId: updateCategory
+      tags: [categories]
+      summary: Update a category (rename, icon, color)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCategoryRequest"
+      responses:
+        "200":
+          description: Updated category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+    delete:
+      operationId: deleteCategory
+      tags: [categories]
+      summary: Delete a category
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /incomes:
+    get:
+      operationId: getIncomes
+      tags: [incomes]
+      summary: Get all incomes for user
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of incomes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Income"
+    post:
+      operationId: createIncome
+      tags: [incomes]
+      summary: Create an income record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIncomeRequest"
+      responses:
+        "201":
+          description: Created income
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Income"
+
+  /incomes/{id}:
+    put:
+      operationId: updateIncome
+      tags: [incomes]
+      summary: Update an income record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIncomeRequest"
+      responses:
+        "200":
+          description: Updated income
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Income"
+    delete:
+      operationId: deleteIncome
+      tags: [incomes]
+      summary: Delete an income record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /expenses:
+    get:
+      operationId: getExpenses
+      tags: [expenses]
+      summary: Get all expenses for user
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of expenses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Expense"
+    post:
+      operationId: createExpense
+      tags: [expenses]
+      summary: Create an expense record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExpenseRequest"
+      responses:
+        "201":
+          description: Created expense
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Expense"
+
+  /expenses/{id}:
+    put:
+      operationId: updateExpense
+      tags: [expenses]
+      summary: Update an expense record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExpenseRequest"
+      responses:
+        "200":
+          description: Updated expense
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Expense"
+    delete:
+      operationId: deleteExpense
+      tags: [expenses]
+      summary: Delete an expense record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /loans:
+    get:
+      operationId: getLoans
+      tags: [loans]
+      summary: Get all loans for user
+      responses:
+        "200":
+          description: List of loans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Loan"
+    post:
+      operationId: createLoan
+      tags: [loans]
+      summary: Create a loan record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLoanRequest"
+      responses:
+        "201":
+          description: Created loan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Loan"
+
+  /loans/{id}:
+    put:
+      operationId: updateLoan
+      tags: [loans]
+      summary: Update a loan record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLoanRequest"
+      responses:
+        "200":
+          description: Updated loan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Loan"
+    delete:
+      operationId: deleteLoan
+      tags: [loans]
+      summary: Delete a loan record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /goals:
+    get:
+      operationId: getGoals
+      tags: [goals]
+      summary: Get all goals for user
+      responses:
+        "200":
+          description: List of goals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Goal"
+    post:
+      operationId: createGoal
+      tags: [goals]
+      summary: Create a goal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGoalRequest"
+      responses:
+        "201":
+          description: Created goal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+
+  /goals/{id}:
+    put:
+      operationId: updateGoal
+      tags: [goals]
+      summary: Update a goal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGoalRequest"
+      responses:
+        "200":
+          description: Updated goal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+    delete:
+      operationId: deleteGoal
+      tags: [goals]
+      summary: Delete a goal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Get dashboard summary
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        fullName:
+          type: string
+        mobile:
+          type: string
+        token:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, fullName, mobile, createdAt, updatedAt]
+
+    RegisterRequest:
+      type: object
+      properties:
+        fullName:
+          type: string
+        mobile:
+          type: string
+        password:
+          type: string
+        confirmPassword:
+          type: string
+      required: [fullName, mobile, password, confirmPassword]
+
+    LoginRequest:
+      type: object
+      properties:
+        mobile:
+          type: string
+        password:
+          type: string
+      required: [mobile, password]
+
+    ChangePasswordRequest:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+        confirmPassword:
+          type: string
+      required: [currentPassword, newPassword, confirmPassword]
+
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        mobile:
+          type: string
+      required: [mobile]
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [income, expense, loan, goal]
+        isDefault:
+          type: boolean
+        icon:
+          type: string
+          nullable: true
+        color:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, userId, name, type, isDefault, createdAt, updatedAt]
+
+    CreateCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [income, expense, loan, goal]
+      required: [name, type]
+
+    UpdateCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        icon:
+          type: string
+        color:
+          type: string
+      required: [name]
+
+    Income:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        categoryId:
+          type: integer
+        categoryName:
+          type: string
+        amount:
+          type: number
+        date:
+          type: string
+        notes:
+          type: string
+        recurrenceType:
+          type: string
+        occurrences:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, userId, categoryId, amount, date, recurrenceType, occurrences, createdAt, updatedAt]
+
+    CreateIncomeRequest:
+      type: object
+      properties:
+        categoryId:
+          type: integer
+        amount:
+          type: number
+        date:
+          type: string
+        notes:
+          type: string
+        recurrenceType:
+          type: string
+        occurrences:
+          type: integer
+      required: [categoryId, amount, date]
+
+    Expense:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        categoryId:
+          type: integer
+        categoryName:
+          type: string
+        amount:
+          type: number
+        date:
+          type: string
+        notes:
+          type: string
+        recurrenceType:
+          type: string
+        occurrences:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, userId, categoryId, amount, date, recurrenceType, occurrences, createdAt, updatedAt]
+
+    CreateExpenseRequest:
+      type: object
+      properties:
+        categoryId:
+          type: integer
+        amount:
+          type: number
+        date:
+          type: string
+        notes:
+          type: string
+        recurrenceType:
+          type: string
+        occurrences:
+          type: integer
+      required: [categoryId, amount, date]
+
+    Loan:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        name:
+          type: string
+        loanType:
+          type: string
+        principalAmount:
+          type: number
+        interestRate:
+          type: number
+        tenureYears:
+          type: integer
+        emi:
+          type: number
+        startDate:
+          type: string
+        endDate:
+          type: string
+        outstandingBalance:
+          type: number
+        principalPaid:
+          type: number
+        interestPaid:
+          type: number
+        totalInterest:
+          type: number
+        monthsCompleted:
+          type: integer
+        monthsRemaining:
+          type: integer
+        totalMonths:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, userId, name, loanType, principalAmount, interestRate, tenureYears, emi, startDate, endDate, outstandingBalance, principalPaid, interestPaid, totalInterest, monthsCompleted, monthsRemaining, totalMonths, createdAt, updatedAt]
+
+    CreateLoanRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        loanType:
+          type: string
+        principalAmount:
+          type: number
+        interestRate:
+          type: number
+        tenureYears:
+          type: integer
+        startDate:
+          type: string
+        emi:
+          type: number
+      required: [name, loanType, principalAmount, interestRate, tenureYears, startDate]
+
+    Goal:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        name:
+          type: string
+        targetAmount:
+          type: number
+        currentAmount:
+          type: number
+        targetDate:
+          type: string
+        progressPercentage:
+          type: number
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, userId, name, targetAmount, currentAmount, targetDate, progressPercentage, createdAt, updatedAt]
+
+    CreateGoalRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        targetAmount:
+          type: number
+        currentAmount:
+          type: number
+        targetDate:
+          type: string
+      required: [name, targetAmount, currentAmount, targetDate]
+
+    UpcomingRecurring:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [income, expense]
+        categoryName:
+          type: string
+        amount:
+          type: number
+        recurrenceType:
+          type: string
+        nextDate:
+          type: string
+      required: [id, type, categoryName, amount, recurrenceType, nextDate]
+
+    DashboardSummary:
+      type: object
+      properties:
+        totalIncome:
+          type: number
+        totalExpenses:
+          type: number
+        savings:
+          type: number
+        activeLoans:
+          type: integer
+        totalOutstanding:
+          type: number
+        emiDueThisMonth:
+          type: number
+        goalsCount:
+          type: integer
+        avgGoalProgress:
+          type: number
+        monthlyIncomes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Income"
+        monthlyExpenses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Expense"
+        upcomingRecurring:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpcomingRecurring"
+      required: [totalIncome, totalExpenses, savings, activeLoans, totalOutstanding, emiDueThisMonth, goalsCount, avgGoalProgress, monthlyIncomes, monthlyExpenses, upcomingRecurring]

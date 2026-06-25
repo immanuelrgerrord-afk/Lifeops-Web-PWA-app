@@ -1,0 +1,58 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+    expose:
+      - "${PORT}"
+    restart: unless-stopped
+    networks:
+      - lifeops
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+      args:
+        EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL}
+        FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
+    expose:
+      - "80"
+    restart: unless-stopped
+    networks:
+      - lifeops
+
+  caddy:
+    image: caddy:2.9-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file:
+      - .env
+    environment:
+      FRONTEND_DOMAIN: ${FRONTEND_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+      PORT: ${PORT}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+    networks:
+      - lifeops
+
+networks:
+  lifeops:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
