@@ -7,10 +7,9 @@ import {
   type Goal,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -21,11 +20,27 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { FieldError } from "@/components/FieldError";
+import { AmountInput } from "@/components/NumericInput";
+import { toDisplayDate, toStorageDate, storageToDisplay } from "@/utils/date";
+import { parseAmount, round2, sanitizeAmountInput } from "@/utils/numeric";
+import {
+  validateAmount,
+  validateDisplayDate,
+  validateGoalAmounts,
+  validateRequired,
+} from "@/utils/validation";
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   editing?: Goal | null;
+}
+
+function defaultTargetDateDisplay(): string {
+  const sixMonths = new Date();
+  sixMonths.setMonth(sixMonths.getMonth() + 6);
+  return toDisplayDate(sixMonths.toISOString().split("T")[0]);
 }
 
 export function AddGoalModal({ visible, onClose, editing }: Props) {
@@ -36,23 +51,38 @@ export function AddGoalModal({ visible, onClose, editing }: Props) {
   const [name, setName] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
   const [currentAmount, setCurrentAmount] = useState("0");
-  const [targetDate, setTargetDate] = useState("");
+  const [targetDate, setTargetDate] = useState(defaultTargetDateDisplay());
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   useEffect(() => {
     if (editing) {
       setName(editing.name);
       setTargetAmount(String(editing.targetAmount));
       setCurrentAmount(String(editing.currentAmount));
-      setTargetDate(editing.targetDate);
+      setTargetDate(storageToDisplay(editing.targetDate));
     } else {
       setName("");
       setTargetAmount("");
       setCurrentAmount("0");
-      const sixMonths = new Date();
-      sixMonths.setMonth(sixMonths.getMonth() + 6);
-      setTargetDate(sixMonths.toISOString().split("T")[0]);
+      setTargetDate(defaultTargetDateDisplay());
     }
+    setTouched({});
+    setSubmitAttempted(false);
   }, [editing, visible]);
+
+  const errors = useMemo(
+    () => ({
+      name: validateRequired(name, "Goal name"),
+      targetAmount: validateAmount(targetAmount, "Target amount"),
+      currentAmount: validateGoalAmounts(targetAmount || "1", currentAmount),
+      targetDate: validateDisplayDate(targetDate),
+    }),
+    [name, targetAmount, currentAmount, targetDate],
+  );
+
+  const show = (field: keyof typeof errors) =>
+    (touched[field] || submitAttempted) ? errors[field] : null;
 
   const createMutation = useCreateGoal({
     mutation: {
@@ -61,7 +91,6 @@ export function AddGoalModal({ visible, onClose, editing }: Props) {
         qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
         onClose();
       },
-      onError: () => Alert.alert("Error", "Could not save goal."),
     },
   });
 
@@ -72,26 +101,32 @@ export function AddGoalModal({ visible, onClose, editing }: Props) {
         qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
         onClose();
       },
-      onError: () => Alert.alert("Error", "Could not update goal."),
     },
   });
 
   const isPending = createMutation.isPending || updateMutation.isPending;
+  const saveError =
+    (createMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+    (updateMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message;
 
   const handleSave = () => {
-    if (!name.trim()) return Alert.alert("Required", "Enter a goal name.");
-    const T = parseFloat(targetAmount);
-    const C = parseFloat(currentAmount) || 0;
-    if (!T || T <= 0) return Alert.alert("Required", "Enter a valid target amount.");
-    if (!targetDate) return Alert.alert("Required", "Enter a target date.");
+    setSubmitAttempted(true);
+    if (Object.values(errors).some(Boolean)) return;
 
-    const payload = { name: name.trim(), targetAmount: T, currentAmount: C, targetDate };
+    const payload = {
+      name: name.trim(),
+      targetAmount: round2(parseAmount(targetAmount)!),
+      currentAmount: round2(parseAmount(currentAmount) ?? 0),
+      targetDate: toStorageDate(targetDate),
+    };
     if (editing) {
       updateMutation.mutate({ id: editing.id, data: payload });
     } else {
       createMutation.mutate({ data: payload });
     }
   };
+
+  const inputStyle = [styles.inputRow, { backgroundColor: colors.card, borderColor: colors.border }];
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -113,7 +148,7 @@ export function AddGoalModal({ visible, onClose, editing }: Props) {
         <ScrollView contentContainerStyle={[styles.form, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled">
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Goal Name</Text>
-            <View style={[styles.inputRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[inputStyle, show("name") ? { borderColor: colors.expense } : null]}>
               <Feather name="flag" size={16} color={colors.goal} />
               <TextInput
                 style={[styles.input, { color: colors.text }]}
@@ -121,53 +156,45 @@ export function AddGoalModal({ visible, onClose, editing }: Props) {
                 placeholderTextColor={colors.textSecondary}
                 value={name}
                 onChangeText={setName}
+                onBlur={() => setTouched((t) => ({ ...t, name: true }))}
               />
             </View>
+            <FieldError message={show("name")} />
           </View>
 
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Target Amount (₹)</Text>
-            <View style={[styles.inputRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="target" size={16} color={colors.goal} />
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder="e.g. 500000"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
-                value={targetAmount}
-                onChangeText={setTargetAmount}
-              />
-            </View>
-          </View>
+          <AmountInput
+            label="Target Amount (₹)"
+            value={targetAmount}
+            onChangeText={(v) => setTargetAmount(sanitizeAmountInput(v))}
+            onBlur={() => setTouched((t) => ({ ...t, targetAmount: true }))}
+            error={show("targetAmount")}
+          />
 
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Current Amount (₹)</Text>
-            <View style={[styles.inputRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="dollar-sign" size={16} color={colors.textSecondary} />
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder="0"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
-                value={currentAmount}
-                onChangeText={setCurrentAmount}
-              />
-            </View>
-          </View>
+          <AmountInput
+            label="Current Amount (₹)"
+            value={currentAmount}
+            onChangeText={(v) => setCurrentAmount(sanitizeAmountInput(v))}
+            onBlur={() => setTouched((t) => ({ ...t, currentAmount: true }))}
+            error={show("currentAmount")}
+          />
 
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Target Date</Text>
-            <View style={[styles.inputRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[inputStyle, show("targetDate") ? { borderColor: colors.expense } : null]}>
               <Feather name="calendar" size={16} color={colors.textSecondary} />
               <TextInput
                 style={[styles.input, { color: colors.text }]}
-                placeholder="YYYY-MM-DD"
+                placeholder="DD-MM-YYYY"
                 placeholderTextColor={colors.textSecondary}
                 value={targetDate}
                 onChangeText={setTargetDate}
+                onBlur={() => setTouched((t) => ({ ...t, targetDate: true }))}
               />
             </View>
+            <FieldError message={show("targetDate")} />
           </View>
+
+          {saveError ? <FieldError message={saveError} /> : null}
         </ScrollView>
       </View>
     </Modal>

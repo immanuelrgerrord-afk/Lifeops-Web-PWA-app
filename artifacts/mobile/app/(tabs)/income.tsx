@@ -127,12 +127,16 @@ export default function IncomeScreen() {
           return (
           <TransactionItem
             categoryName={item.categoryName ?? ""}
+            categoryIcon={item.categoryIcon}
+            categoryColor={item.categoryColor}
             amount={item.amount}
+            perOccurrenceAmount={(item as Income & { perOccurrenceAmount?: number }).perOccurrenceAmount}
             date={item.date}
             notes={item.notes}
             type="income"
             recurrenceType={item.recurrenceType}
             recurrenceLabel={ext.recurrenceLabel}
+            occurrences={item.occurrences}
             totalPlannedCost={ext.totalPlannedCost}
             onEdit={() => { setEditing(item); setModalVisible(true); }}
             onDelete={() => handleDelete(item.id)}

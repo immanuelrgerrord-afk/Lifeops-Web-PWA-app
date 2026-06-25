@@ -5,6 +5,7 @@
  * LifeOps personal finance API
  * OpenAPI spec version: 0.3.0
  */
+import type { CategorySummary } from './categorySummary';
 import type { Expense } from './expense';
 import type { Income } from './income';
 import type { UpcomingRecurring } from './upcomingRecurring';
@@ -24,4 +25,6 @@ export interface DashboardSummary {
   upcomingRecurring: UpcomingRecurring[];
   upcomingRecurringIncome?: UpcomingRecurringItem[];
   upcomingRecurringExpenses?: UpcomingRecurringItem[];
+  topSpendingCategories: CategorySummary[];
+  topIncomeCategories: CategorySummary[];
 }

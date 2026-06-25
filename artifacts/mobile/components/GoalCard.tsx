@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import { toDisplayDate } from "@/utils/date";
 
 interface GoalCardProps {
   name: string;
@@ -41,7 +42,9 @@ export function GoalCard({ name, targetAmount, currentAmount, targetDate, progre
         </View>
         <View style={styles.titleBlock}>
           <Text style={[styles.name, { color: colors.text }]}>{name}</Text>
-          <Text style={[styles.timeline, { color: colors.textSecondary }]}>{daysLeft(targetDate)}</Text>
+          <Text style={[styles.timeline, { color: colors.textSecondary }]}>
+            {toDisplayDate(targetDate)} · {daysLeft(targetDate)}
+          </Text>
         </View>
         <View style={styles.actions}>
           {onEdit && (

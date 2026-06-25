@@ -174,6 +174,8 @@ export const GetIncomesResponseItem = zod.object({
   "userId": zod.number(),
   "categoryId": zod.number(),
   "categoryName": zod.string().optional(),
+  "categoryIcon": zod.string().optional(),
+  "categoryColor": zod.string().optional(),
   "amount": zod.number(),
   "date": zod.string(),
   "notes": zod.string().optional(),
@@ -225,6 +227,8 @@ export const UpdateIncomeResponse = zod.object({
   "userId": zod.number(),
   "categoryId": zod.number(),
   "categoryName": zod.string().optional(),
+  "categoryIcon": zod.string().optional(),
+  "categoryColor": zod.string().optional(),
   "amount": zod.number(),
   "date": zod.string(),
   "notes": zod.string().optional(),
@@ -265,6 +269,8 @@ export const GetExpensesResponseItem = zod.object({
   "userId": zod.number(),
   "categoryId": zod.number(),
   "categoryName": zod.string().optional(),
+  "categoryIcon": zod.string().optional(),
+  "categoryColor": zod.string().optional(),
   "amount": zod.number(),
   "date": zod.string(),
   "notes": zod.string().optional(),
@@ -277,14 +283,18 @@ export const GetExpensesResponseItem = zod.object({
   "recurrenceLabel": zod.string().optional(),
   "totalPlannedCost": zod.number().optional(),
   "emiDetails": zod.object({
-  "emiStartDate": zod.string(),
-  "emiDurationMonths": zod.number(),
-  "monthsCompleted": zod.number(),
-  "monthsRemaining": zod.number(),
-  "totalPaid": zod.number(),
-  "remainingAmount": zod.number(),
+  "matched": zod.boolean(),
+  "loanName": zod.string().optional(),
+  "emiAmount": zod.number(),
+  "unmatchedMessage": zod.string().optional(),
+  "emiStartDate": zod.string().optional(),
+  "emiDurationMonths": zod.number().optional(),
+  "monthsCompleted": zod.number().optional(),
+  "monthsRemaining": zod.number().optional(),
+  "totalPaid": zod.number().optional(),
+  "remainingAmount": zod.number().optional(),
   "nextEmiDate": zod.string().nullish(),
-  "completionPercentage": zod.number()
+  "completionPercentage": zod.number().optional()
 }).optional(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -326,6 +336,8 @@ export const UpdateExpenseResponse = zod.object({
   "userId": zod.number(),
   "categoryId": zod.number(),
   "categoryName": zod.string().optional(),
+  "categoryIcon": zod.string().optional(),
+  "categoryColor": zod.string().optional(),
   "amount": zod.number(),
   "date": zod.string(),
   "notes": zod.string().optional(),
@@ -338,14 +350,18 @@ export const UpdateExpenseResponse = zod.object({
   "recurrenceLabel": zod.string().optional(),
   "totalPlannedCost": zod.number().optional(),
   "emiDetails": zod.object({
-  "emiStartDate": zod.string(),
-  "emiDurationMonths": zod.number(),
-  "monthsCompleted": zod.number(),
-  "monthsRemaining": zod.number(),
-  "totalPaid": zod.number(),
-  "remainingAmount": zod.number(),
+  "matched": zod.boolean(),
+  "loanName": zod.string().optional(),
+  "emiAmount": zod.number(),
+  "unmatchedMessage": zod.string().optional(),
+  "emiStartDate": zod.string().optional(),
+  "emiDurationMonths": zod.number().optional(),
+  "monthsCompleted": zod.number().optional(),
+  "monthsRemaining": zod.number().optional(),
+  "totalPaid": zod.number().optional(),
+  "remainingAmount": zod.number().optional(),
   "nextEmiDate": zod.string().nullish(),
-  "completionPercentage": zod.number()
+  "completionPercentage": zod.number().optional()
 }).optional(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -551,6 +567,8 @@ export const GetDashboardResponse = zod.object({
   "userId": zod.number(),
   "categoryId": zod.number(),
   "categoryName": zod.string().optional(),
+  "categoryIcon": zod.string().optional(),
+  "categoryColor": zod.string().optional(),
   "amount": zod.number(),
   "date": zod.string(),
   "notes": zod.string().optional(),
@@ -570,6 +588,8 @@ export const GetDashboardResponse = zod.object({
   "userId": zod.number(),
   "categoryId": zod.number(),
   "categoryName": zod.string().optional(),
+  "categoryIcon": zod.string().optional(),
+  "categoryColor": zod.string().optional(),
   "amount": zod.number(),
   "date": zod.string(),
   "notes": zod.string().optional(),
@@ -582,14 +602,18 @@ export const GetDashboardResponse = zod.object({
   "recurrenceLabel": zod.string().optional(),
   "totalPlannedCost": zod.number().optional(),
   "emiDetails": zod.object({
-  "emiStartDate": zod.string(),
-  "emiDurationMonths": zod.number(),
-  "monthsCompleted": zod.number(),
-  "monthsRemaining": zod.number(),
-  "totalPaid": zod.number(),
-  "remainingAmount": zod.number(),
+  "matched": zod.boolean(),
+  "loanName": zod.string().optional(),
+  "emiAmount": zod.number(),
+  "unmatchedMessage": zod.string().optional(),
+  "emiStartDate": zod.string().optional(),
+  "emiDurationMonths": zod.number().optional(),
+  "monthsCompleted": zod.number().optional(),
+  "monthsRemaining": zod.number().optional(),
+  "totalPaid": zod.number().optional(),
+  "remainingAmount": zod.number().optional(),
   "nextEmiDate": zod.string().nullish(),
-  "completionPercentage": zod.number()
+  "completionPercentage": zod.number().optional()
 }).optional(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -598,6 +622,8 @@ export const GetDashboardResponse = zod.object({
   "id": zod.number(),
   "type": zod.enum(['income', 'expense']),
   "categoryName": zod.string(),
+  "categoryIcon": zod.string().optional(),
+  "categoryColor": zod.string().optional(),
   "amount": zod.number(),
   "recurrenceType": zod.string(),
   "nextDate": zod.string()
@@ -605,6 +631,8 @@ export const GetDashboardResponse = zod.object({
   "upcomingRecurringIncome": zod.array(zod.object({
   "id": zod.number(),
   "categoryName": zod.string(),
+  "categoryIcon": zod.string().optional(),
+  "categoryColor": zod.string().optional(),
   "amount": zod.number(),
   "recurrenceType": zod.string(),
   "nextDate": zod.string()
@@ -612,10 +640,26 @@ export const GetDashboardResponse = zod.object({
   "upcomingRecurringExpenses": zod.array(zod.object({
   "id": zod.number(),
   "categoryName": zod.string(),
+  "categoryIcon": zod.string().optional(),
+  "categoryColor": zod.string().optional(),
   "amount": zod.number(),
   "recurrenceType": zod.string(),
   "nextDate": zod.string()
-})).optional()
+})).optional(),
+  "topSpendingCategories": zod.array(zod.object({
+  "categoryId": zod.number(),
+  "categoryName": zod.string(),
+  "categoryIcon": zod.string().optional(),
+  "categoryColor": zod.string().optional(),
+  "total": zod.number()
+})),
+  "topIncomeCategories": zod.array(zod.object({
+  "categoryId": zod.number(),
+  "categoryName": zod.string(),
+  "categoryIcon": zod.string().optional(),
+  "categoryColor": zod.string().optional(),
+  "total": zod.number()
+}))
 })
 
 

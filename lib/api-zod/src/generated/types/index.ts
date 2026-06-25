@@ -7,6 +7,7 @@
  */
 
 export * from './category';
+export * from './categorySummary';
 export * from './categoryType';
 export * from './changePasswordRequest';
 export * from './createCategoryRequest';

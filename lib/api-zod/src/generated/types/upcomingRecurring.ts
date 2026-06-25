@@ -11,6 +11,8 @@ export interface UpcomingRecurring {
   id: number;
   type: UpcomingRecurringType;
   categoryName: string;
+  categoryIcon?: string;
+  categoryColor?: string;
   amount: number;
   recurrenceType: string;
   nextDate: string;

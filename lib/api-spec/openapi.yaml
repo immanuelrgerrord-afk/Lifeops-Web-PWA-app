@@ -701,6 +701,10 @@ components:
           type: integer
         categoryName:
           type: string
+        categoryIcon:
+          type: string
+        categoryColor:
+          type: string
         amount:
           type: number
         date:
@@ -759,6 +763,10 @@ components:
           type: integer
         categoryName:
           type: string
+        categoryIcon:
+          type: string
+        categoryColor:
+          type: string
         amount:
           type: number
         date:
@@ -794,6 +802,14 @@ components:
     EmiDetails:
       type: object
       properties:
+        matched:
+          type: boolean
+        loanName:
+          type: string
+        emiAmount:
+          type: number
+        unmatchedMessage:
+          type: string
         emiStartDate:
           type: string
         emiDurationMonths:
@@ -811,7 +827,7 @@ components:
           nullable: true
         completionPercentage:
           type: number
-      required: [emiStartDate, emiDurationMonths, monthsCompleted, monthsRemaining, totalPaid, remainingAmount, completionPercentage]
+      required: [matched, emiAmount]
 
     CreateExpenseRequest:
       type: object
@@ -945,6 +961,10 @@ components:
           enum: [income, expense]
         categoryName:
           type: string
+        categoryIcon:
+          type: string
+        categoryColor:
+          type: string
         amount:
           type: number
         recurrenceType:
@@ -960,6 +980,10 @@ components:
           type: integer
         categoryName:
           type: string
+        categoryIcon:
+          type: string
+        categoryColor:
+          type: string
         amount:
           type: number
         recurrenceType:
@@ -967,6 +991,21 @@ components:
         nextDate:
           type: string
       required: [id, categoryName, amount, recurrenceType, nextDate]
+
+    CategorySummary:
+      type: object
+      properties:
+        categoryId:
+          type: integer
+        categoryName:
+          type: string
+        categoryIcon:
+          type: string
+        categoryColor:
+          type: string
+        total:
+          type: number
+      required: [categoryId, categoryName, total]
 
     DashboardSummary:
       type: object
@@ -1007,4 +1046,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UpcomingRecurringItem"
-      required: [totalIncome, totalExpenses, savings, activeLoans, totalOutstanding, emiDueThisMonth, goalsCount, avgGoalProgress, monthlyIncomes, monthlyExpenses, upcomingRecurring]
+        topSpendingCategories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategorySummary"
+        topIncomeCategories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategorySummary"
+      required: [totalIncome, totalExpenses, savings, activeLoans, totalOutstanding, emiDueThisMonth, goalsCount, avgGoalProgress, monthlyIncomes, monthlyExpenses, upcomingRecurring, topSpendingCategories, topIncomeCategories]

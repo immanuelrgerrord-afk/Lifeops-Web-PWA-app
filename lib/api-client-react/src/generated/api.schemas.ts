@@ -94,6 +94,8 @@ export interface Income {
   userId: number;
   categoryId: number;
   categoryName?: string;
+  categoryIcon?: string;
+  categoryColor?: string;
   amount: number;
   date: string;
   notes?: string;
@@ -119,14 +121,18 @@ export interface CreateIncomeRequest {
 }
 
 export interface EmiDetails {
-  emiStartDate: string;
-  emiDurationMonths: number;
-  monthsCompleted: number;
-  monthsRemaining: number;
-  totalPaid: number;
-  remainingAmount: number;
+  matched: boolean;
+  loanName?: string;
+  emiAmount: number;
+  unmatchedMessage?: string;
+  emiStartDate?: string;
+  emiDurationMonths?: number;
+  monthsCompleted?: number;
+  monthsRemaining?: number;
+  totalPaid?: number;
+  remainingAmount?: number;
   nextEmiDate?: string | null;
-  completionPercentage: number;
+  completionPercentage?: number;
 }
 
 export interface Expense {
@@ -134,6 +140,8 @@ export interface Expense {
   userId: number;
   categoryId: number;
   categoryName?: string;
+  categoryIcon?: string;
+  categoryColor?: string;
   amount: number;
   date: string;
   notes?: string;
@@ -225,6 +233,8 @@ export interface UpcomingRecurring {
   id: number;
   type: UpcomingRecurringType;
   categoryName: string;
+  categoryIcon?: string;
+  categoryColor?: string;
   amount: number;
   recurrenceType: string;
   nextDate: string;
@@ -233,9 +243,19 @@ export interface UpcomingRecurring {
 export interface UpcomingRecurringItem {
   id: number;
   categoryName: string;
+  categoryIcon?: string;
+  categoryColor?: string;
   amount: number;
   recurrenceType: string;
   nextDate: string;
+}
+
+export interface CategorySummary {
+  categoryId: number;
+  categoryName: string;
+  categoryIcon?: string;
+  categoryColor?: string;
+  total: number;
 }
 
 export interface DashboardSummary {
@@ -252,6 +272,8 @@ export interface DashboardSummary {
   upcomingRecurring: UpcomingRecurring[];
   upcomingRecurringIncome?: UpcomingRecurringItem[];
   upcomingRecurringExpenses?: UpcomingRecurringItem[];
+  topSpendingCategories: CategorySummary[];
+  topIncomeCategories: CategorySummary[];
 }
 
 export type GetCategoriesParams = {

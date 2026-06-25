@@ -2,37 +2,27 @@ import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import { CategoryBadge } from "@/components/CategoryChip";
+import { toDisplayDate } from "@/utils/date";
+import { formatINR } from "@/utils/numeric";
 
 interface TransactionItemProps {
   categoryName: string;
+  categoryIcon?: string | null;
+  categoryColor?: string | null;
   amount: number;
+  perOccurrenceAmount?: number;
   date: string;
   notes?: string | null;
   type: "income" | "expense";
   recurrenceType?: string;
   recurrenceLabel?: string;
+  occurrences?: number;
   totalPlannedCost?: number;
   onEdit?: () => void;
   onDelete?: () => void;
 }
 
-function formatAmount(n: number) {
-  return n.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
-}
-
-function formatDate(d: string) {
-  try {
-    const parts = d.split("-");
-    if (parts.length === 3 && parts[0].length === 4) {
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
-    }
-    return d;
-  } catch {
-    return d;
-  }
-}
-
-/** Smart category display: if "Other" and notes exist, show notes as the label */
 function displayLabel(categoryName: string, notes?: string | null): string {
   if (categoryName === "Other" && notes?.trim()) return notes.trim();
   return categoryName;
@@ -40,12 +30,16 @@ function displayLabel(categoryName: string, notes?: string | null): string {
 
 export function TransactionItem({
   categoryName,
+  categoryIcon,
+  categoryColor,
   amount,
+  perOccurrenceAmount,
   date,
   notes,
   type,
   recurrenceType,
   recurrenceLabel,
+  occurrences,
   totalPlannedCost,
   onEdit,
   onDelete,
@@ -54,39 +48,40 @@ export function TransactionItem({
   const isIncome = type === "income";
   const accentColor = isIncome ? colors.income : colors.expense;
   const label = displayLabel(categoryName, notes);
+  const isRecurring = recurrenceType && recurrenceType !== "one-time";
+  const unitAmount = perOccurrenceAmount ?? amount;
 
   return (
     <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[styles.dot, { backgroundColor: accentColor + "25" }]}>
-        <Feather
-          name={isIncome ? "arrow-down-left" : "arrow-up-right"}
-          size={16}
-          color={accentColor}
-        />
-      </View>
+      <CategoryBadge
+        name={label}
+        icon={categoryIcon}
+        color={categoryColor}
+        fallbackAccent={accentColor}
+      />
       <View style={styles.info}>
         <Text style={[styles.category, { color: colors.text }]}>{label}</Text>
-        {/* Show original category tag if smart-display changed the label */}
         {label !== categoryName && (
           <Text style={[styles.catTag, { color: colors.textSecondary }]}>{categoryName}</Text>
         )}
         {notes && label === categoryName ? (
           <Text style={[styles.notes, { color: colors.textSecondary }]}>{notes}</Text>
         ) : null}
-        {recurrenceType && recurrenceType !== "one-time" ? (
+        {isRecurring ? (
           <Text style={[styles.recurrence, { color: colors.textSecondary }]}>
-            {recurrenceLabel ?? recurrenceType} · Total {formatAmount(totalPlannedCost ?? amount)}
+            {formatINR(unitAmount)} {recurrenceLabel ?? recurrenceType} × {occurrences ?? 1}
           </Text>
-        ) : (
-          <Text style={[styles.date, { color: colors.textSecondary }]}>{formatDate(date)}</Text>
-        )}
-        {recurrenceType && recurrenceType !== "one-time" ? (
-          <Text style={[styles.date, { color: colors.textSecondary }]}>{formatDate(date)}</Text>
+        ) : null}
+        <Text style={[styles.date, { color: colors.textSecondary }]}>{toDisplayDate(date)}</Text>
+        {isRecurring && totalPlannedCost != null ? (
+          <Text style={[styles.planned, { color: colors.textSecondary }]}>
+            Total Planned {formatINR(totalPlannedCost)}
+          </Text>
         ) : null}
       </View>
       <View style={styles.right}>
         <Text style={[styles.amount, { color: accentColor }]}>
-          {isIncome ? "+" : "-"}{formatAmount(amount)}
+          {isIncome ? "+" : "-"}{formatINR(amount)}
         </Text>
         <View style={styles.actions}>
           {onEdit && (
@@ -115,13 +110,6 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 10,
   },
-  dot: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   info: {
     flex: 1,
     gap: 2,
@@ -144,6 +132,10 @@ const styles = StyleSheet.create({
   },
   recurrence: {
     fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
+  planned: {
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
   },
   right: {

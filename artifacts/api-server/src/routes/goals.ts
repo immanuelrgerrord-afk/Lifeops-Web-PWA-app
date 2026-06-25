@@ -22,6 +22,19 @@ function formatGoal(r: typeof goals.$inferSelect) {
   };
 }
 
+function validateGoalPayload(
+  targetAmount?: number,
+  currentAmount?: number,
+): string | null {
+  if (targetAmount === undefined || targetAmount <= 0) {
+    return "Target amount must be greater than zero.";
+  }
+  const current = currentAmount ?? 0;
+  if (current < 0) return "Current amount cannot be negative.";
+  if (current > targetAmount) return "Current amount cannot exceed target amount.";
+  return null;
+}
+
 router.get("/goals", requireAuth, async (req, res) => {
   const rows = await db.select().from(goals).where(eq(goals.userId, req.userId!)).orderBy(goals.targetDate);
   return res.json(rows.map(formatGoal));
@@ -31,15 +44,18 @@ router.post("/goals", requireAuth, async (req, res) => {
   const { name, targetAmount, currentAmount, targetDate } = req.body as {
     name?: string; targetAmount?: number; currentAmount?: number; targetDate?: string;
   };
-  if (!name || !targetAmount || !targetDate) {
-    return res.status(400).json({ message: "name, targetAmount, targetDate are required" });
-  }
+  if (!name?.trim()) return res.status(400).json({ message: "Goal name is required." });
+  if (!targetDate) return res.status(400).json({ message: "Target date is required." });
+
+  const validationErr = validateGoalPayload(targetAmount, currentAmount);
+  if (validationErr) return res.status(400).json({ message: validationErr });
+
   const now = new Date();
   const [row] = await db
     .insert(goals)
     .values({
       userId: req.userId!,
-      name,
+      name: name.trim(),
       targetAmount: String(targetAmount),
       currentAmount: String(currentAmount ?? 0),
       targetDate,
@@ -54,14 +70,27 @@ router.put("/goals/:id", requireAuth, async (req, res) => {
   const { name, targetAmount, currentAmount, targetDate } = req.body as {
     name?: string; targetAmount?: number; currentAmount?: number; targetDate?: string;
   };
+
+  const [existing] = await db
+    .select()
+    .from(goals)
+    .where(and(eq(goals.id, id), eq(goals.userId, req.userId!)));
+
+  if (!existing) return res.status(404).json({ message: "Not found" });
+
+  const nextTarget = targetAmount !== undefined ? targetAmount : Number(existing.targetAmount);
+  const nextCurrent = currentAmount !== undefined ? currentAmount : Number(existing.currentAmount);
+  const validationErr = validateGoalPayload(nextTarget, nextCurrent);
+  if (validationErr) return res.status(400).json({ message: validationErr });
+
   const now = new Date();
   const [row] = await db
     .update(goals)
     .set({
-      name,
-      targetAmount: targetAmount !== undefined ? String(targetAmount) : undefined,
-      currentAmount: currentAmount !== undefined ? String(currentAmount) : undefined,
-      targetDate,
+      name: name?.trim() ?? existing.name,
+      targetAmount: String(nextTarget),
+      currentAmount: String(nextCurrent),
+      targetDate: targetDate ?? existing.targetDate,
       updatedAt: now,
     })
     .where(and(eq(goals.id, id), eq(goals.userId, req.userId!)))

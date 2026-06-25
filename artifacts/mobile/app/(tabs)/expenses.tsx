@@ -135,7 +135,10 @@ export default function ExpensesScreen() {
           <ExpenseCard
             id={item.id}
             categoryName={item.categoryName ?? ""}
+            categoryIcon={item.categoryIcon}
+            categoryColor={item.categoryColor}
             amount={item.amount}
+            perOccurrenceAmount={(item as Expense & { perOccurrenceAmount?: number }).perOccurrenceAmount}
             date={item.date}
             notes={item.notes}
             recurrenceType={item.recurrenceType ?? "one-time"}

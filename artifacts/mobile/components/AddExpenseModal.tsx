@@ -8,10 +8,9 @@ import {
   type Expense,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -22,7 +21,16 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
-import { todayDisplay, toStorageDate, isValidDisplayDate, storageToDisplay } from "@/utils/date";
+import { CategoryChip } from "@/components/CategoryChip";
+import { FieldError } from "@/components/FieldError";
+import { AmountInput, IntegerInput } from "@/components/NumericInput";
+import { todayDisplay, toStorageDate, storageToDisplay } from "@/utils/date";
+import { parseAmount, round2, sanitizeAmountInput } from "@/utils/numeric";
+import {
+  validateAmount,
+  validateDisplayDate,
+  validateOccurrences,
+} from "@/utils/validation";
 
 const RECURRENCE_OPTIONS = [
   { key: "one-time", label: "One Time" },
@@ -50,6 +58,8 @@ export function AddExpenseModal({ visible, onClose, editing }: Props) {
   const [notes, setNotes] = useState("");
   const [recurrenceType, setRecurrenceType] = useState("one-time");
   const [occurrences, setOccurrences] = useState("1");
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   useEffect(() => {
     if (editing) {
@@ -67,7 +77,23 @@ export function AddExpenseModal({ visible, onClose, editing }: Props) {
       setRecurrenceType("one-time");
       setOccurrences("1");
     }
+    setTouched({});
+    setSubmitAttempted(false);
   }, [editing, visible]);
+
+  const errors = useMemo(
+    () => ({
+      amount: validateAmount(amount),
+      category: selectedCat ? null : "Select a category.",
+      date: validateDisplayDate(date),
+      occurrences:
+        recurrenceType === "one-time" ? null : validateOccurrences(occurrences),
+    }),
+    [amount, selectedCat, date, occurrences, recurrenceType],
+  );
+
+  const show = (field: keyof typeof errors) =>
+    (touched[field] || submitAttempted) ? errors[field] : null;
 
   const createMutation = useCreateExpense({
     mutation: {
@@ -75,10 +101,6 @@ export function AddExpenseModal({ visible, onClose, editing }: Props) {
         qc.invalidateQueries({ queryKey: getGetExpensesQueryKey() });
         qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
         onClose();
-      },
-      onError: (err: any) => {
-        const msg = err?.response?.data?.message ?? "Could not save expense.";
-        Alert.alert("Error", msg);
       },
     },
   });
@@ -90,26 +112,23 @@ export function AddExpenseModal({ visible, onClose, editing }: Props) {
         qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
         onClose();
       },
-      onError: (err: any) => {
-        const msg = err?.response?.data?.message ?? "Could not update expense.";
-        Alert.alert("Error", msg);
-      },
     },
   });
 
   const isPending = createMutation.isPending || updateMutation.isPending;
+  const saveError =
+    (createMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+    (updateMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message;
 
   const handleSave = () => {
-    const amt = parseFloat(amount);
-    if (!selectedCat) return Alert.alert("Required", "Select a category.");
-    if (!amt || amt <= 0) return Alert.alert("Required", "Enter a valid amount (must be > 0).");
-    if (!date || !isValidDisplayDate(date)) return Alert.alert("Required", "Enter a valid date (DD-MM-YYYY).");
-    const occ = parseInt(occurrences, 10);
-    if (isNaN(occ) || occ < 1) return Alert.alert("Required", "Number of occurrences must be at least 1.");
+    setSubmitAttempted(true);
+    if (Object.values(errors).some(Boolean)) return;
 
+    const amt = round2(parseAmount(amount)!);
     const storedDate = toStorageDate(date);
+    const occ = recurrenceType === "one-time" ? 1 : parseInt(occurrences, 10);
     const payload = {
-      categoryId: selectedCat,
+      categoryId: selectedCat!,
       amount: amt,
       date: storedDate,
       notes: notes || undefined,
@@ -146,50 +165,38 @@ export function AddExpenseModal({ visible, onClose, editing }: Props) {
           contentContainerStyle={[styles.form, { paddingBottom: insets.bottom + 40 }]}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Amount */}
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Amount (₹)</Text>
-            <View style={inputStyle}>
-              <Feather name="trending-down" size={16} color={colors.expense} />
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder="0.00"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
-                value={amount}
-                onChangeText={setAmount}
-              />
-            </View>
-          </View>
+          <AmountInput
+            label="Amount (₹)"
+            value={amount}
+            onChangeText={(v) => setAmount(sanitizeAmountInput(v))}
+            onBlur={() => setTouched((t) => ({ ...t, amount: true }))}
+            error={show("amount")}
+          />
 
-          {/* Category */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Category</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
               {categories.map((c) => (
-                <Pressable
+                <CategoryChip
                   key={c.id}
-                  onPress={() => setSelectedCat(c.id)}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor: selectedCat === c.id ? colors.expense + "25" : colors.card,
-                      borderColor: selectedCat === c.id ? colors.expense : colors.border,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.chipText, { color: selectedCat === c.id ? colors.expense : colors.text }]}>
-                    {c.name}
-                  </Text>
-                </Pressable>
+                  name={c.name}
+                  icon={c.icon}
+                  color={c.color}
+                  selected={selectedCat === c.id}
+                  accentColor={colors.expense}
+                  onPress={() => {
+                    setSelectedCat(c.id);
+                    setTouched((t) => ({ ...t, category: true }));
+                  }}
+                />
               ))}
             </ScrollView>
+            <FieldError message={show("category")} />
           </View>
 
-          {/* Date */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Date</Text>
-            <View style={inputStyle}>
+            <View style={[inputStyle, show("date") ? { borderColor: colors.expense } : null]}>
               <Feather name="calendar" size={16} color={colors.textSecondary} />
               <TextInput
                 style={[styles.input, { color: colors.text }]}
@@ -197,11 +204,12 @@ export function AddExpenseModal({ visible, onClose, editing }: Props) {
                 placeholderTextColor={colors.textSecondary}
                 value={date}
                 onChangeText={setDate}
+                onBlur={() => setTouched((t) => ({ ...t, date: true }))}
               />
             </View>
+            <FieldError message={show("date")} />
           </View>
 
-          {/* Recurrence */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Recurrence</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
@@ -225,30 +233,18 @@ export function AddExpenseModal({ visible, onClose, editing }: Props) {
             </ScrollView>
           </View>
 
-          {/* Occurrences (only if not one-time) */}
           {recurrenceType !== "one-time" && (
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                Number of Occurrences
-              </Text>
-              <View style={inputStyle}>
-                <Feather name="repeat" size={16} color={colors.textSecondary} />
-                <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="e.g. 12"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="numeric"
-                  value={occurrences}
-                  onChangeText={setOccurrences}
-                />
-                <Text style={{ color: colors.textSecondary, fontSize: 13, fontFamily: "Inter_400Regular" }}>
-                  × {recurrenceType}
-                </Text>
-              </View>
-            </View>
+            <IntegerInput
+              label="Number of Occurrences"
+              value={occurrences}
+              onChangeText={setOccurrences}
+              onBlur={() => setTouched((t) => ({ ...t, occurrences: true }))}
+              error={show("occurrences")}
+              suffix={`× ${recurrenceType}`}
+              placeholder="e.g. 12"
+            />
           )}
 
-          {/* Notes */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Notes (optional)</Text>
             <View style={[styles.textareaRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -263,6 +259,8 @@ export function AddExpenseModal({ visible, onClose, editing }: Props) {
               />
             </View>
           </View>
+
+          {saveError ? <FieldError message={saveError} /> : null}
         </ScrollView>
       </View>
     </Modal>

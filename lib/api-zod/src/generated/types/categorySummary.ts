@@ -6,12 +6,10 @@
  * OpenAPI spec version: 0.3.0
  */
 
-export interface UpcomingRecurringItem {
-  id: number;
+export interface CategorySummary {
+  categoryId: number;
   categoryName: string;
   categoryIcon?: string;
   categoryColor?: string;
-  amount: number;
-  recurrenceType: string;
-  nextDate: string;
+  total: number;
 }

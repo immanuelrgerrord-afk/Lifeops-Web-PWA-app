@@ -3,7 +3,7 @@ import type { Loan } from "@workspace/api-client-react";
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
-import { formatReadableDate } from "@/utils/date";
+import { toDisplayDate } from "@/utils/date";
 
 interface LoanCardProps {
   loan: Loan;
@@ -166,8 +166,8 @@ export function LoanCard({ loan, onEdit, onDelete }: LoanCardProps) {
             <GridItem label="Interest Left" value={fmtShort(Math.max(0, emi * monthsRemaining - outstandingBalance))} colors={colors} />
             <GridItem label="Total Interest" value={fmtShort(totalInterest)} colors={colors} />
             <GridItem label="Months Left" value={`${monthsRemaining} mo`} colors={colors} />
-            <GridItem label="Start Date" value={formatReadableDate(startDate)} colors={colors} />
-            <GridItem label="End Date" value={formatReadableDate(endDate)} colors={colors} />
+            <GridItem label="Start Date" value={toDisplayDate(startDate)} colors={colors} />
+            <GridItem label="End Date" value={toDisplayDate(endDate)} colors={colors} />
           </View>
 
           {/* Prepayment Simulator – available for all loan types */}

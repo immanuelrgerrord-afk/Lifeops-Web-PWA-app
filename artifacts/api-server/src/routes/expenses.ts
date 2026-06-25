@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { db, expenses, categories, loans } from "@workspace/db";
-import { eq, and, like, or, isNotNull } from "drizzle-orm";
+import { eq, and, like, or, isNotNull, isNull, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
 import { getOwnedCategory } from "../lib/categories.js";
-import { isValidRecurrenceType, recurrenceLabel, totalPlannedCost } from "../lib/recurrence.js";
+import { isValidRecurrenceType, nextOccurrenceDate } from "../lib/recurrence.js";
 import { syncRecurringForUser } from "../lib/recurringSync.js";
-import { nextOccurrenceDate } from "../lib/recurrence.js";
 import { formatLoanMetrics } from "../lib/loanCalculations.js";
+import { buildTemplateMap, resolveRecurrenceDisplay } from "../lib/transactionFormat.js";
 
 const router = Router();
 
@@ -24,9 +24,41 @@ function findMatchingLoan(
   return loanRows.find((l) => Math.abs(Number(l.emi) - amount) < 0.01) ?? null;
 }
 
+function buildEmiDetails(
+  amount: number,
+  loan: (typeof loans.$inferSelect) | null,
+  notes?: string | null,
+) {
+  if (loan) {
+    const metrics = formatLoanMetrics(loan);
+    return {
+      matched: true,
+      loanName: loan.name,
+      emiAmount: Number(loan.emi),
+      emiStartDate: loan.startDate,
+      emiDurationMonths: metrics.totalMonths,
+      monthsCompleted: metrics.monthsCompleted,
+      monthsRemaining: metrics.monthsRemaining,
+      totalPaid: Math.round((metrics.principalPaid + metrics.interestPaid) * 100) / 100,
+      remainingAmount: metrics.outstandingBalance,
+      nextEmiDate: metrics.nextEmiDate,
+      completionPercentage: metrics.completionPercentage,
+    };
+  }
+
+  return {
+    matched: false,
+    loanName: notes?.trim() || undefined,
+    emiAmount: amount,
+    unmatchedMessage:
+      "We couldn't link this EMI to a loan. Add the loan name in notes or match the EMI amount to an active loan.",
+  };
+}
+
 function formatExpense(
   r: {
     id: number; userId: number; categoryId: number; categoryName: string | null;
+    categoryIcon: string | null; categoryColor: string | null;
     amount: string; date: string; notes: string | null;
     recurrenceType: string; occurrences: number;
     generatedOccurrences: number; nextOccurrenceDate: string | null;
@@ -34,24 +66,31 @@ function formatExpense(
     createdAt: Date; updatedAt: Date;
   },
   loanRows: (typeof loans.$inferSelect)[],
+  templateMap: ReturnType<typeof buildTemplateMap>,
 ) {
   const amount = Number(r.amount);
+  const recurrence = resolveRecurrenceDisplay(r, templateMap);
   const base = {
     id: r.id,
     userId: r.userId,
     categoryId: r.categoryId,
     categoryName: r.categoryName ?? "",
+    categoryIcon: r.categoryIcon ?? undefined,
+    categoryColor: r.categoryColor ?? undefined,
     amount,
     date: r.date,
     notes: r.notes ?? undefined,
-    recurrenceType: r.recurrenceType,
-    occurrences: r.occurrences,
-    occurrenceCount: r.occurrences,
+    recurrenceType: recurrence.recurrenceType,
+    occurrences: recurrence.occurrences,
+    occurrenceCount: recurrence.occurrenceCount,
+    perOccurrenceAmount: recurrence.perOccurrenceAmount,
     generatedOccurrences: r.generatedOccurrences,
     nextOccurrenceDate: r.nextOccurrenceDate,
     parentId: r.parentId,
-    recurrenceLabel: recurrenceLabel(r.recurrenceType),
-    totalPlannedCost: totalPlannedCost(amount, r.recurrenceType, r.occurrences),
+    recurrenceLabel: recurrence.recurrenceLabel,
+    totalPlannedCost: recurrence.totalPlannedCost,
+    isMaterializedOccurrence: recurrence.isMaterializedOccurrence,
+    templateId: recurrence.templateId,
     isRecurringTemplate: r.parentId == null && r.recurrenceType !== "one-time",
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
@@ -59,22 +98,7 @@ function formatExpense(
 
   if (r.categoryName === "EMI") {
     const loan = findMatchingLoan(loanRows, amount, r.notes);
-    if (loan) {
-      const metrics = formatLoanMetrics(loan);
-      return {
-        ...base,
-        emiDetails: {
-          emiStartDate: loan.startDate,
-          emiDurationMonths: metrics.totalMonths,
-          monthsCompleted: metrics.monthsCompleted,
-          monthsRemaining: metrics.monthsRemaining,
-          totalPaid: metrics.principalPaid + metrics.interestPaid,
-          remainingAmount: metrics.outstandingBalance,
-          nextEmiDate: metrics.nextEmiDate,
-          completionPercentage: metrics.completionPercentage,
-        },
-      };
-    }
+    return { ...base, emiDetails: buildEmiDetails(amount, loan, r.notes) };
   }
 
   return base;
@@ -87,8 +111,42 @@ function validateRecurrence(recurrenceType?: string, occurrences?: number): stri
   if (occurrences !== undefined && (!Number.isInteger(occurrences) || occurrences < 1)) {
     return "Occurrence count must be at least 1.";
   }
+  if (occurrences !== undefined && occurrences > 9999) {
+    return "Occurrence count cannot exceed 9,999.";
+  }
   return null;
 }
+
+async function loadExpenseTemplates(userId: number) {
+  return db
+    .select({
+      id: expenses.id,
+      amount: expenses.amount,
+      recurrenceType: expenses.recurrenceType,
+      occurrences: expenses.occurrences,
+    })
+    .from(expenses)
+    .where(and(eq(expenses.userId, userId), isNull(expenses.parentId), ne(expenses.recurrenceType, "one-time")));
+}
+
+const expenseSelect = {
+  id: expenses.id,
+  userId: expenses.userId,
+  categoryId: expenses.categoryId,
+  categoryName: categories.name,
+  categoryIcon: categories.icon,
+  categoryColor: categories.color,
+  amount: expenses.amount,
+  date: expenses.date,
+  notes: expenses.notes,
+  recurrenceType: expenses.recurrenceType,
+  occurrences: expenses.occurrences,
+  generatedOccurrences: expenses.generatedOccurrences,
+  nextOccurrenceDate: expenses.nextOccurrenceDate,
+  parentId: expenses.parentId,
+  createdAt: expenses.createdAt,
+  updatedAt: expenses.updatedAt,
+};
 
 router.get("/expenses", requireAuth, async (req, res) => {
   await syncRecurringForUser(req.userId!);
@@ -100,31 +158,19 @@ router.get("/expenses", requireAuth, async (req, res) => {
   ];
   if (month) conditions.push(like(expenses.date, `${month}%`));
 
-  const loanRows = await db.select().from(loans).where(eq(loans.userId, userId));
+  const [loanRows, templates, rows] = await Promise.all([
+    db.select().from(loans).where(eq(loans.userId, userId)),
+    loadExpenseTemplates(userId),
+    db
+      .select(expenseSelect)
+      .from(expenses)
+      .leftJoin(categories, and(eq(expenses.categoryId, categories.id), eq(categories.userId, userId)))
+      .where(and(...conditions))
+      .orderBy(expenses.date),
+  ]);
 
-  const rows = await db
-    .select({
-      id: expenses.id,
-      userId: expenses.userId,
-      categoryId: expenses.categoryId,
-      categoryName: categories.name,
-      amount: expenses.amount,
-      date: expenses.date,
-      notes: expenses.notes,
-      recurrenceType: expenses.recurrenceType,
-      occurrences: expenses.occurrences,
-      generatedOccurrences: expenses.generatedOccurrences,
-      nextOccurrenceDate: expenses.nextOccurrenceDate,
-      parentId: expenses.parentId,
-      createdAt: expenses.createdAt,
-      updatedAt: expenses.updatedAt,
-    })
-    .from(expenses)
-    .leftJoin(categories, and(eq(expenses.categoryId, categories.id), eq(categories.userId, userId)))
-    .where(and(...conditions))
-    .orderBy(expenses.date);
-
-  return res.json(rows.map((r) => formatExpense(r, loanRows)));
+  const templateMap = buildTemplateMap(templates);
+  return res.json(rows.map((r) => formatExpense(r, loanRows, templateMap)));
 });
 
 router.post("/expenses", requireAuth, async (req, res) => {
@@ -165,8 +211,23 @@ router.post("/expenses", requireAuth, async (req, res) => {
     .returning();
 
   await syncRecurringForUser(userId);
-  const loanRows = await db.select().from(loans).where(eq(loans.userId, userId));
-  return res.status(201).json(formatExpense({ ...row, categoryName: owned.category.name }, loanRows));
+  const [loanRows, templates] = await Promise.all([
+    db.select().from(loans).where(eq(loans.userId, userId)),
+    loadExpenseTemplates(userId),
+  ]);
+  const templateMap = buildTemplateMap(templates);
+  return res.status(201).json(
+    formatExpense(
+      {
+        ...row,
+        categoryName: owned.category.name,
+        categoryIcon: owned.category.icon,
+        categoryColor: owned.category.color,
+      },
+      loanRows,
+      templateMap,
+    ),
+  );
 });
 
 router.put("/expenses/:id", requireAuth, async (req, res) => {
@@ -186,9 +247,23 @@ router.put("/expenses/:id", requireAuth, async (req, res) => {
   const owned = await getOwnedCategory(userId, categoryId, "expense");
   if ("error" in owned) return res.status(owned.status).json({ message: owned.error });
 
+  const [existing] = await db
+    .select()
+    .from(expenses)
+    .where(and(eq(expenses.id, id), eq(expenses.userId, userId)));
+
+  if (!existing) return res.status(404).json({ message: "Not found" });
+
   const type = recurrenceType ?? "one-time";
   const count = type === "one-time" ? 1 : (occurrences ?? 1);
-  const nextDate = type === "one-time" ? null : nextOccurrenceDate(date, type, count, 0);
+  const recurrenceUnchanged =
+    existing.recurrenceType === type && existing.occurrences === count;
+  const nextDate =
+    type === "one-time"
+      ? null
+      : recurrenceUnchanged && existing.nextOccurrenceDate
+        ? existing.nextOccurrenceDate
+        : nextOccurrenceDate(date, type, count, existing.generatedOccurrences);
 
   const now = new Date();
   const [row] = await db
@@ -200,7 +275,7 @@ router.put("/expenses/:id", requireAuth, async (req, res) => {
       notes: notes ?? null,
       recurrenceType: type,
       occurrences: count,
-      generatedOccurrences: 0,
+      generatedOccurrences: recurrenceUnchanged ? existing.generatedOccurrences : 0,
       nextOccurrenceDate: nextDate,
       updatedAt: now,
     })
@@ -209,8 +284,23 @@ router.put("/expenses/:id", requireAuth, async (req, res) => {
 
   if (!row) return res.status(404).json({ message: "Not found" });
   await syncRecurringForUser(userId);
-  const loanRows = await db.select().from(loans).where(eq(loans.userId, userId));
-  return res.json(formatExpense({ ...row, categoryName: owned.category.name }, loanRows));
+  const [loanRows, templates] = await Promise.all([
+    db.select().from(loans).where(eq(loans.userId, userId)),
+    loadExpenseTemplates(userId),
+  ]);
+  const templateMap = buildTemplateMap(templates);
+  return res.json(
+    formatExpense(
+      {
+        ...row,
+        categoryName: owned.category.name,
+        categoryIcon: owned.category.icon,
+        categoryColor: owned.category.color,
+      },
+      loanRows,
+      templateMap,
+    ),
+  );
 });
 
 router.delete("/expenses/:id", requireAuth, async (req, res) => {

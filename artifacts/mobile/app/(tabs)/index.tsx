@@ -17,7 +17,9 @@ import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { StatCard } from "@/components/StatCard";
 import { TransactionItem } from "@/components/TransactionItem";
-import { formatReadableDate } from "@/utils/date";
+import { toDisplayDate } from "@/utils/date";
+import { formatINR } from "@/utils/numeric";
+import { CategoryBadge } from "@/components/CategoryChip";
 
 function currentMonth() {
   const d = new Date();
@@ -91,7 +93,10 @@ export default function DashboardScreen() {
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 6);
 
-  const upcomingRecurring = data?.upcomingRecurring ?? [];
+  const upcomingIncome = data?.upcomingRecurringIncome ?? [];
+  const upcomingExpenses = data?.upcomingRecurringExpenses ?? [];
+  const topSpending = data?.topSpendingCategories ?? [];
+  const topIncome = data?.topIncomeCategories ?? [];
   const emiDue = data?.emiDueThisMonth ?? 0;
 
   return (
@@ -225,45 +230,119 @@ export default function DashboardScreen() {
               </View>
             )}
 
-            {/* Upcoming Recurring */}
-            {upcomingRecurring.length > 0 && (
+            {(topSpending.length > 0 || topIncome.length > 0) && (
               <View style={styles.recentSection}>
-                <Text style={[styles.recentTitle, { color: colors.text }]}>Upcoming (next 30 days)</Text>
-                {upcomingRecurring.map((item) => (
-                  <View
-                    key={`${item.type}-${item.id}`}
-                    style={[
-                      styles.recurringItem,
-                      {
-                        backgroundColor: colors.card,
-                        borderColor: colors.border,
-                        borderLeftColor: item.type === "income" ? colors.income : colors.expense,
-                      },
-                    ]}
-                  >
-                    <View style={styles.recurringLeft}>
-                      <Feather
-                        name={item.type === "income" ? "trending-up" : "trending-down"}
-                        size={14}
-                        color={item.type === "income" ? colors.income : colors.expense}
-                      />
-                      <View>
-                        <Text style={[styles.recurringName, { color: colors.text }]}>{item.categoryName}</Text>
-                        <Text style={[styles.recurringMeta, { color: colors.textSecondary }]}>
-                          {recurrenceLabel(item.recurrenceType)} · {formatReadableDate(item.nextDate)}
+                <Text style={[styles.recentTitle, { color: colors.text }]}>Monthly Breakdown</Text>
+                {topSpending.length > 0 && (
+                  <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Top Spending Categories</Text>
+                    {topSpending.map((cat) => (
+                      <View key={`spend-${cat.categoryId}`} style={styles.categoryRow}>
+                        <CategoryBadge
+                          name={cat.categoryName}
+                          icon={cat.categoryIcon}
+                          color={cat.categoryColor}
+                          fallbackAccent={colors.expense}
+                          size={32}
+                        />
+                        <Text style={[styles.categoryName, { color: colors.text }]}>{cat.categoryName}</Text>
+                        <Text style={[styles.categoryAmount, { color: colors.expense }]}>
+                          {formatINR(cat.total)}
                         </Text>
                       </View>
-                    </View>
-                    <Text
-                      style={[
-                        styles.recurringAmount,
-                        { color: item.type === "income" ? colors.income : colors.expense },
-                      ]}
-                    >
-                      {item.type === "income" ? "+" : "-"}{fmtShort(item.amount)}
-                    </Text>
+                    ))}
                   </View>
-                ))}
+                )}
+                {topIncome.length > 0 && (
+                  <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 10 }]}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Top Income Categories</Text>
+                    {topIncome.map((cat) => (
+                      <View key={`income-${cat.categoryId}`} style={styles.categoryRow}>
+                        <CategoryBadge
+                          name={cat.categoryName}
+                          icon={cat.categoryIcon}
+                          color={cat.categoryColor}
+                          fallbackAccent={colors.income}
+                          size={32}
+                        />
+                        <Text style={[styles.categoryName, { color: colors.text }]}>{cat.categoryName}</Text>
+                        <Text style={[styles.categoryAmount, { color: colors.income }]}>
+                          {formatINR(cat.total)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+
+            {(upcomingIncome.length > 0 || upcomingExpenses.length > 0) && (
+              <View style={styles.recentSection}>
+                <Text style={[styles.recentTitle, { color: colors.text }]}>Upcoming (next 30 days)</Text>
+                {upcomingIncome.length > 0 && (
+                  <>
+                    <Text style={[styles.subSectionTitle, { color: colors.income }]}>Upcoming Income</Text>
+                    {upcomingIncome.map((item) => (
+                      <View
+                        key={`inc-${item.id}-${item.nextDate}`}
+                        style={[
+                          styles.recurringItem,
+                          {
+                            backgroundColor: colors.card,
+                            borderColor: colors.border,
+                            borderLeftColor: colors.income,
+                          },
+                        ]}
+                      >
+                        <View style={styles.recurringLeft}>
+                          <Feather name="trending-up" size={14} color={colors.income} />
+                          <View>
+                            <Text style={[styles.recurringName, { color: colors.text }]}>{item.categoryName}</Text>
+                            <Text style={[styles.recurringMeta, { color: colors.textSecondary }]}>
+                              {recurrenceLabel(item.recurrenceType)} · {toDisplayDate(item.nextDate)}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.recurringAmount, { color: colors.income }]}>
+                          +{fmtShort(item.amount)}
+                        </Text>
+                      </View>
+                    ))}
+                  </>
+                )}
+                {upcomingExpenses.length > 0 && (
+                  <>
+                    <Text style={[styles.subSectionTitle, { color: colors.expense, marginTop: upcomingIncome.length ? 12 : 0 }]}>
+                      Upcoming Expenses
+                    </Text>
+                    {upcomingExpenses.map((item) => (
+                      <View
+                        key={`exp-${item.id}-${item.nextDate}`}
+                        style={[
+                          styles.recurringItem,
+                          {
+                            backgroundColor: colors.card,
+                            borderColor: colors.border,
+                            borderLeftColor: colors.expense,
+                          },
+                        ]}
+                      >
+                        <View style={styles.recurringLeft}>
+                          <Feather name="trending-down" size={14} color={colors.expense} />
+                          <View>
+                            <Text style={[styles.recurringName, { color: colors.text }]}>{item.categoryName}</Text>
+                            <Text style={[styles.recurringMeta, { color: colors.textSecondary }]}>
+                              {recurrenceLabel(item.recurrenceType)} · {toDisplayDate(item.nextDate)}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.recurringAmount, { color: colors.expense }]}>
+                          -{fmtShort(item.amount)}
+                        </Text>
+                      </View>
+                    ))}
+                  </>
+                )}
               </View>
             )}
 
@@ -275,10 +354,17 @@ export default function DashboardScreen() {
                   <TransactionItem
                     key={`${t.type}-${t.id}`}
                     categoryName={t.categoryName ?? ""}
+                    categoryIcon={(t as { categoryIcon?: string }).categoryIcon}
+                    categoryColor={(t as { categoryColor?: string }).categoryColor}
                     amount={t.amount}
+                    perOccurrenceAmount={(t as { perOccurrenceAmount?: number }).perOccurrenceAmount}
                     date={t.date}
                     notes={t.notes}
                     type={t.type}
+                    recurrenceType={t.recurrenceType}
+                    recurrenceLabel={(t as { recurrenceLabel?: string }).recurrenceLabel}
+                    occurrences={t.occurrences}
+                    totalPlannedCost={(t as { totalPlannedCost?: number }).totalPlannedCost}
                   />
                 ))}
               </View>
@@ -354,6 +440,10 @@ const styles = StyleSheet.create({
   recurringName: { fontSize: 14, fontFamily: "Inter_500Medium" },
   recurringMeta: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
   recurringAmount: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  subSectionTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.4 },
+  categoryRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 },
+  categoryName: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium" },
+  categoryAmount: { fontSize: 14, fontFamily: "Inter_700Bold" },
   emptyState: { alignItems: "center", paddingVertical: 60, gap: 12 },
   emptyTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold" },
   emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },

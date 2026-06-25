@@ -7,12 +7,16 @@
  */
 
 export interface EmiDetails {
-  emiStartDate: string;
-  emiDurationMonths: number;
-  monthsCompleted: number;
-  monthsRemaining: number;
-  totalPaid: number;
-  remainingAmount: number;
+  matched: boolean;
+  loanName?: string;
+  emiAmount: number;
+  unmatchedMessage?: string;
+  emiStartDate?: string;
+  emiDurationMonths?: number;
+  monthsCompleted?: number;
+  monthsRemaining?: number;
+  totalPaid?: number;
+  remainingAmount?: number;
   nextEmiDate?: string | null;
-  completionPercentage: number;
+  completionPercentage?: number;
 }

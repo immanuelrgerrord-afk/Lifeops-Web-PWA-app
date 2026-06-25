@@ -3,8 +3,9 @@ import { db, incomes, expenses, loans, goals, categories } from "@workspace/db";
 import { eq, and, like, sum, ne, isNull, or, isNotNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.js";
 import { emiAmountForMonth, formatLoanMetrics } from "../lib/loanCalculations.js";
-import { upcomingOccurrences, recurrenceLabel } from "../lib/recurrence.js";
+import { upcomingOccurrences } from "../lib/recurrence.js";
 import { syncRecurringForUser } from "../lib/recurringSync.js";
+import { buildTemplateMap, resolveRecurrenceDisplay } from "../lib/transactionFormat.js";
 
 const router = Router();
 
@@ -157,64 +158,181 @@ router.get("/dashboard", requireAuth, async (req, res) => {
     ...upcomingRecurringExpenses.map((e) => ({ ...e, type: "expense" as const })),
   ].sort((a, b) => a.nextDate.localeCompare(b.nextDate));
 
-  const monthlyIncomeRows = await db
-    .select({
-      id: incomes.id,
-      userId: incomes.userId,
-      categoryId: incomes.categoryId,
-      categoryName: categories.name,
-      amount: incomes.amount,
-      date: incomes.date,
-      notes: incomes.notes,
-      recurrenceType: incomes.recurrenceType,
-      occurrences: incomes.occurrences,
-      generatedOccurrences: incomes.generatedOccurrences,
-      nextOccurrenceDate: incomes.nextOccurrenceDate,
-      parentId: incomes.parentId,
-      createdAt: incomes.createdAt,
-      updatedAt: incomes.updatedAt,
-    })
-    .from(incomes)
-    .leftJoin(categories, and(eq(incomes.categoryId, categories.id), eq(categories.userId, userId)))
-    .where(and(eq(incomes.userId, userId), like(incomes.date, `${month}%`)))
-    .orderBy(incomes.date);
+  const [incomeTemplatesForMap, expenseTemplatesForMap, monthlyIncomeRows, monthlyExpenseRows] =
+    await Promise.all([
+      db
+        .select({
+          id: incomes.id,
+          amount: incomes.amount,
+          recurrenceType: incomes.recurrenceType,
+          occurrences: incomes.occurrences,
+        })
+        .from(incomes)
+        .where(and(eq(incomes.userId, userId), isNull(incomes.parentId), ne(incomes.recurrenceType, "one-time"))),
+      db
+        .select({
+          id: expenses.id,
+          amount: expenses.amount,
+          recurrenceType: expenses.recurrenceType,
+          occurrences: expenses.occurrences,
+        })
+        .from(expenses)
+        .where(and(eq(expenses.userId, userId), isNull(expenses.parentId), ne(expenses.recurrenceType, "one-time"))),
+      db
+        .select({
+          id: incomes.id,
+          userId: incomes.userId,
+          categoryId: incomes.categoryId,
+          categoryName: categories.name,
+          categoryIcon: categories.icon,
+          categoryColor: categories.color,
+          amount: incomes.amount,
+          date: incomes.date,
+          notes: incomes.notes,
+          recurrenceType: incomes.recurrenceType,
+          occurrences: incomes.occurrences,
+          generatedOccurrences: incomes.generatedOccurrences,
+          nextOccurrenceDate: incomes.nextOccurrenceDate,
+          parentId: incomes.parentId,
+          createdAt: incomes.createdAt,
+          updatedAt: incomes.updatedAt,
+        })
+        .from(incomes)
+        .leftJoin(categories, and(eq(incomes.categoryId, categories.id), eq(categories.userId, userId)))
+        .where(
+          and(
+            eq(incomes.userId, userId),
+            like(incomes.date, `${month}%`),
+            or(isNotNull(incomes.parentId), eq(incomes.recurrenceType, "one-time")),
+          ),
+        )
+        .orderBy(incomes.date),
+      db
+        .select({
+          id: expenses.id,
+          userId: expenses.userId,
+          categoryId: expenses.categoryId,
+          categoryName: categories.name,
+          categoryIcon: categories.icon,
+          categoryColor: categories.color,
+          amount: expenses.amount,
+          date: expenses.date,
+          notes: expenses.notes,
+          recurrenceType: expenses.recurrenceType,
+          occurrences: expenses.occurrences,
+          generatedOccurrences: expenses.generatedOccurrences,
+          nextOccurrenceDate: expenses.nextOccurrenceDate,
+          parentId: expenses.parentId,
+          createdAt: expenses.createdAt,
+          updatedAt: expenses.updatedAt,
+        })
+        .from(expenses)
+        .leftJoin(categories, and(eq(expenses.categoryId, categories.id), eq(categories.userId, userId)))
+        .where(
+          and(
+            eq(expenses.userId, userId),
+            like(expenses.date, `${month}%`),
+            or(isNotNull(expenses.parentId), eq(expenses.recurrenceType, "one-time")),
+          ),
+        )
+        .orderBy(expenses.date),
+    ]);
 
-  const monthlyExpenseRows = await db
-    .select({
-      id: expenses.id,
-      userId: expenses.userId,
-      categoryId: expenses.categoryId,
-      categoryName: categories.name,
-      amount: expenses.amount,
-      date: expenses.date,
-      notes: expenses.notes,
-      recurrenceType: expenses.recurrenceType,
-      occurrences: expenses.occurrences,
-      generatedOccurrences: expenses.generatedOccurrences,
-      nextOccurrenceDate: expenses.nextOccurrenceDate,
-      parentId: expenses.parentId,
-      createdAt: expenses.createdAt,
-      updatedAt: expenses.updatedAt,
-    })
-    .from(expenses)
-    .leftJoin(categories, and(eq(expenses.categoryId, categories.id), eq(categories.userId, userId)))
-    .where(and(eq(expenses.userId, userId), like(expenses.date, `${month}%`)))
-    .orderBy(expenses.date);
+  const incomeTemplateMap = buildTemplateMap(incomeTemplatesForMap);
+  const expenseTemplateMap = buildTemplateMap(expenseTemplatesForMap);
 
-  const mapTx = (r: {
-    id: number; userId: number; categoryId: number; categoryName: string | null;
-    amount: string; date: string; notes: string | null; recurrenceType: string;
-    occurrences: number; generatedOccurrences: number; nextOccurrenceDate: string | null;
-    parentId: number | null; createdAt: Date; updatedAt: Date;
-  }) => ({
-    ...r,
-    amount: Number(r.amount),
-    categoryName: r.categoryName ?? "",
-    notes: r.notes ?? undefined,
-    recurrenceLabel: recurrenceLabel(r.recurrenceType),
-    createdAt: r.createdAt.toISOString(),
-    updatedAt: r.updatedAt.toISOString(),
-  });
+  const mapIncome = (r: (typeof monthlyIncomeRows)[number]) => {
+    const recurrence = resolveRecurrenceDisplay(r, incomeTemplateMap);
+    return {
+      id: r.id,
+      userId: r.userId,
+      categoryId: r.categoryId,
+      categoryName: r.categoryName ?? "",
+      categoryIcon: r.categoryIcon ?? undefined,
+      categoryColor: r.categoryColor ?? undefined,
+      amount: Number(r.amount),
+      date: r.date,
+      notes: r.notes ?? undefined,
+      recurrenceType: recurrence.recurrenceType,
+      occurrences: recurrence.occurrences,
+      occurrenceCount: recurrence.occurrenceCount,
+      perOccurrenceAmount: recurrence.perOccurrenceAmount,
+      generatedOccurrences: r.generatedOccurrences,
+      nextOccurrenceDate: r.nextOccurrenceDate,
+      parentId: r.parentId,
+      recurrenceLabel: recurrence.recurrenceLabel,
+      totalPlannedCost: recurrence.totalPlannedCost,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+    };
+  };
+
+  const mapExpense = (r: (typeof monthlyExpenseRows)[number]) => {
+    const recurrence = resolveRecurrenceDisplay(r, expenseTemplateMap);
+    return {
+      id: r.id,
+      userId: r.userId,
+      categoryId: r.categoryId,
+      categoryName: r.categoryName ?? "",
+      categoryIcon: r.categoryIcon ?? undefined,
+      categoryColor: r.categoryColor ?? undefined,
+      amount: Number(r.amount),
+      date: r.date,
+      notes: r.notes ?? undefined,
+      recurrenceType: recurrence.recurrenceType,
+      occurrences: recurrence.occurrences,
+      occurrenceCount: recurrence.occurrenceCount,
+      perOccurrenceAmount: recurrence.perOccurrenceAmount,
+      generatedOccurrences: r.generatedOccurrences,
+      nextOccurrenceDate: r.nextOccurrenceDate,
+      parentId: r.parentId,
+      recurrenceLabel: recurrence.recurrenceLabel,
+      totalPlannedCost: recurrence.totalPlannedCost,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+    };
+  };
+
+  const monthlyIncomes = monthlyIncomeRows.map(mapIncome);
+  const monthlyExpenses = monthlyExpenseRows.map(mapExpense);
+
+  type CategoryAgg = {
+    categoryId: number;
+    categoryName: string;
+    categoryIcon?: string;
+    categoryColor?: string;
+    total: number;
+  };
+
+  const aggregateByCategory = (
+    rows: Array<{
+      categoryId: number;
+      categoryName: string;
+      categoryIcon?: string;
+      categoryColor?: string;
+      amount: number;
+    }>,
+  ): CategoryAgg[] => {
+    const map = new Map<number, CategoryAgg>();
+    for (const row of rows) {
+      const existing = map.get(row.categoryId);
+      if (existing) {
+        existing.total += row.amount;
+      } else {
+        map.set(row.categoryId, {
+          categoryId: row.categoryId,
+          categoryName: row.categoryName,
+          categoryIcon: row.categoryIcon,
+          categoryColor: row.categoryColor,
+          total: row.amount,
+        });
+      }
+    }
+    return [...map.values()].sort((a, b) => b.total - a.total);
+  };
+
+  const topSpendingCategories = aggregateByCategory(monthlyExpenses).slice(0, 8);
+  const topIncomeCategories = aggregateByCategory(monthlyIncomes).slice(0, 8);
 
   return res.json({
     totalIncome,
@@ -225,8 +343,10 @@ router.get("/dashboard", requireAuth, async (req, res) => {
     emiDueThisMonth: Math.round(emiDueThisMonth * 100) / 100,
     goalsCount: goalRows.length,
     avgGoalProgress: Math.round(avgGoalProgress * 10) / 10,
-    monthlyIncomes: monthlyIncomeRows.map(mapTx),
-    monthlyExpenses: monthlyExpenseRows.map(mapTx),
+    monthlyIncomes,
+    monthlyExpenses,
+    topSpendingCategories,
+    topIncomeCategories,
     upcomingRecurring,
     upcomingRecurringIncome,
     upcomingRecurringExpenses,

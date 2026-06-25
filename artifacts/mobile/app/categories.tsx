@@ -7,6 +7,7 @@ import {
   getGetCategoriesQueryKey,
   getGetIncomesQueryKey,
   getGetExpensesQueryKey,
+  getGetDashboardQueryKey,
   type Category,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -191,6 +192,9 @@ export default function CategoriesScreen() {
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: getGetCategoriesQueryKey() });
+    qc.invalidateQueries({ queryKey: getGetIncomesQueryKey() });
+    qc.invalidateQueries({ queryKey: getGetExpensesQueryKey() });
+    qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
     refetch();
   };
 

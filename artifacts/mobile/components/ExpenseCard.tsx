@@ -2,22 +2,32 @@ import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import { CategoryBadge } from "@/components/CategoryChip";
+import { toDisplayDate } from "@/utils/date";
+import { formatINR } from "@/utils/numeric";
 
 interface EmiDetails {
-  emiStartDate: string;
-  emiDurationMonths: number;
-  monthsCompleted: number;
-  monthsRemaining: number;
-  totalPaid: number;
-  remainingAmount: number;
-  nextEmiDate: string | null;
-  completionPercentage: number;
+  matched: boolean;
+  loanName?: string;
+  emiAmount: number;
+  unmatchedMessage?: string;
+  emiStartDate?: string;
+  emiDurationMonths?: number;
+  monthsCompleted?: number;
+  monthsRemaining?: number;
+  totalPaid?: number;
+  remainingAmount?: number;
+  nextEmiDate?: string | null;
+  completionPercentage?: number;
 }
 
 interface ExpenseCardProps {
   id: number;
   categoryName: string;
+  categoryIcon?: string | null;
+  categoryColor?: string | null;
   amount: number;
+  perOccurrenceAmount?: number;
   date: string;
   notes?: string | null;
   recurrenceType: string;
@@ -29,28 +39,12 @@ interface ExpenseCardProps {
   onDelete?: () => void;
 }
 
-function fmtINR(n: number) {
-  return "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
-}
-
-function fmtDate(d: string) {
-  try {
-    const parts = d.split("-");
-    if (parts.length === 3 && parts[0].length === 4) {
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
-    }
-    return d;
-  } catch {
-    return d;
-  }
-}
-
 function recurrenceLabel(type: string): string {
   const map: Record<string, string> = {
     "one-time": "One Time",
     monthly: "Monthly",
     quarterly: "Quarterly",
-    "half-yearly": "Half-Yearly",
+    "half-yearly": "Half Yearly",
     yearly: "Yearly",
   };
   return map[type] ?? type;
@@ -58,7 +52,10 @@ function recurrenceLabel(type: string): string {
 
 export function ExpenseCard({
   categoryName,
+  categoryIcon,
+  categoryColor,
   amount,
+  perOccurrenceAmount,
   date,
   notes,
   recurrenceType,
@@ -76,15 +73,19 @@ export function ExpenseCard({
 
   const isEMI = categoryName === "EMI";
   const isRecurring = recurrenceType !== "one-time";
-  const planned = totalPlannedCost ?? (isRecurring ? amount * occurrences : amount);
+  const unitAmount = perOccurrenceAmount ?? amount;
+  const planned = totalPlannedCost ?? (isRecurring ? unitAmount * occurrences : amount);
   const recLabel = recurrenceLabelProp ?? recurrenceLabel(recurrenceType);
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.mainRow}>
-        <View style={[styles.iconBox, { backgroundColor: colors.expense + "20" }]}>
-          <Feather name="trending-down" size={16} color={colors.expense} />
-        </View>
+        <CategoryBadge
+          name={displayName}
+          icon={categoryIcon}
+          color={categoryColor}
+          fallbackAccent={colors.expense}
+        />
 
         <View style={styles.info}>
           <Text style={[styles.name, { color: colors.text }]}>{displayName}</Text>
@@ -95,17 +96,17 @@ export function ExpenseCard({
 
           {isRecurring ? (
             <Text style={[styles.recurrence, { color: colors.textSecondary }]}>
-              {recLabel} × {occurrences}
+              {formatINR(unitAmount)} {recLabel} × {occurrences}
             </Text>
           ) : (
             <Text style={[styles.recurrence, { color: colors.textSecondary }]}>
-              {fmtDate(date)} · One Time
+              {toDisplayDate(date)} · One Time
             </Text>
           )}
         </View>
 
         <View style={styles.rightCol}>
-          <Text style={[styles.amount, { color: colors.expense }]}>-{fmtINR(amount)}</Text>
+          <Text style={[styles.amount, { color: colors.expense }]}>-{formatINR(amount)}</Text>
           <View style={styles.actions}>
             {onEdit && (
               <Pressable onPress={onEdit} hitSlop={8} style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}>
@@ -124,49 +125,76 @@ export function ExpenseCard({
       {isRecurring && (
         <View style={[styles.plannedRow, { borderTopColor: colors.border }]}>
           <Text style={[styles.plannedLabel, { color: colors.textSecondary }]}>Total Planned</Text>
-          <Text style={[styles.plannedValue, { color: colors.text }]}>{fmtINR(planned)}</Text>
+          <Text style={[styles.plannedValue, { color: colors.text }]}>{formatINR(planned)}</Text>
         </View>
       )}
 
       {isEMI && emiDetails && (
         <View style={[styles.emiBox, { backgroundColor: colors.expense + "08", borderColor: colors.expense + "25" }]}>
-          <View style={styles.emiGrid}>
-            <View style={styles.emiCell}>
-              <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Started</Text>
-              <Text style={[styles.emiVal, { color: colors.text }]}>{fmtDate(emiDetails.emiStartDate)}</Text>
-            </View>
-            <View style={styles.emiCell}>
-              <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Duration</Text>
-              <Text style={[styles.emiVal, { color: colors.text }]}>{emiDetails.emiDurationMonths} months</Text>
-            </View>
-            <View style={styles.emiCell}>
-              <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Completed</Text>
-              <Text style={[styles.emiVal, { color: colors.income }]}>{emiDetails.monthsCompleted}</Text>
-            </View>
-            <View style={styles.emiCell}>
-              <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Remaining</Text>
-              <Text style={[styles.emiVal, { color: colors.expense }]}>{emiDetails.monthsRemaining}</Text>
-            </View>
-            <View style={styles.emiCell}>
-              <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Paid</Text>
-              <Text style={[styles.emiVal, { color: colors.income }]}>{fmtINR(emiDetails.totalPaid)}</Text>
-            </View>
-            <View style={styles.emiCell}>
-              <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Left</Text>
-              <Text style={[styles.emiVal, { color: colors.expense }]}>{fmtINR(emiDetails.remainingAmount)}</Text>
-            </View>
+          <View style={styles.emiHeader}>
+            <Text style={[styles.emiTitle, { color: colors.text }]}>EMI Details</Text>
+            <Text style={[styles.emiAmount, { color: colors.expense }]}>{formatINR(emiDetails.emiAmount)}</Text>
           </View>
-          <View style={[styles.progressRow, { borderTopColor: colors.expense + "20" }]}>
-            <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Completion</Text>
-            <Text style={[styles.emiVal, { color: colors.text }]}>{emiDetails.completionPercentage}%</Text>
-          </View>
-          {emiDetails.nextEmiDate && (
-            <View style={[styles.nextEMIRow, { borderTopColor: colors.expense + "20" }]}>
-              <Feather name="calendar" size={12} color={colors.expense} />
-              <Text style={[styles.nextEMIText, { color: colors.expense }]}>
-                Next EMI: {fmtDate(emiDetails.nextEmiDate)}
-              </Text>
-            </View>
+
+          {emiDetails.loanName ? (
+            <Text style={[styles.loanName, { color: colors.textSecondary }]}>{emiDetails.loanName}</Text>
+          ) : null}
+
+          {!emiDetails.matched ? (
+            <Text style={[styles.unmatched, { color: colors.textSecondary }]}>
+              {emiDetails.unmatchedMessage ??
+                "We couldn't link this EMI to a loan. Add the loan name in notes or match the EMI amount."}
+            </Text>
+          ) : (
+            <>
+              <View style={styles.emiGrid}>
+                <View style={styles.emiCell}>
+                  <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Start Date</Text>
+                  <Text style={[styles.emiVal, { color: colors.text }]}>
+                    {toDisplayDate(emiDetails.emiStartDate ?? "")}
+                  </Text>
+                </View>
+                <View style={styles.emiCell}>
+                  <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Duration</Text>
+                  <Text style={[styles.emiVal, { color: colors.text }]}>
+                    {emiDetails.emiDurationMonths} months
+                  </Text>
+                </View>
+                <View style={styles.emiCell}>
+                  <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Completed</Text>
+                  <Text style={[styles.emiVal, { color: colors.income }]}>{emiDetails.monthsCompleted}</Text>
+                </View>
+                <View style={styles.emiCell}>
+                  <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Remaining</Text>
+                  <Text style={[styles.emiVal, { color: colors.expense }]}>{emiDetails.monthsRemaining}</Text>
+                </View>
+                <View style={styles.emiCell}>
+                  <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Total Paid</Text>
+                  <Text style={[styles.emiVal, { color: colors.income }]}>
+                    {formatINR(emiDetails.totalPaid ?? 0)}
+                  </Text>
+                </View>
+                <View style={styles.emiCell}>
+                  <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Remaining Amt</Text>
+                  <Text style={[styles.emiVal, { color: colors.expense }]}>
+                    {formatINR(emiDetails.remainingAmount ?? 0)}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.progressRow, { borderTopColor: colors.expense + "20" }]}>
+                <Text style={[styles.emiKey, { color: colors.textSecondary }]}>Completion</Text>
+                <Text style={[styles.emiVal, { color: colors.text }]}>
+                  {emiDetails.completionPercentage}%
+                </Text>
+              </View>
+              {emiDetails.nextEmiDate ? (
+                <View style={[styles.nextEMIRow, { borderTopColor: colors.expense + "20" }]}>
+                  <Text style={[styles.nextEMIText, { color: colors.expense }]}>
+                    Next EMI: {toDisplayDate(emiDetails.nextEmiDate)}
+                  </Text>
+                </View>
+              ) : null}
+            </>
           )}
         </View>
       )}
@@ -186,13 +214,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 14,
     gap: 12,
-  },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
   },
   info: {
     flex: 1,
@@ -244,13 +265,33 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
+    gap: 8,
+  },
+  emiHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  emiTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  emiAmount: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+  },
+  loanName: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
+  unmatched: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 18,
   },
   emiGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 0,
   },
   emiCell: {
     width: "33.33%",
@@ -270,15 +311,12 @@ const styles = StyleSheet.create({
   progressRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 8,
+    marginTop: 4,
     paddingTop: 8,
     borderTopWidth: 1,
   },
   nextEMIRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 8,
+    marginTop: 4,
     paddingTop: 8,
     borderTopWidth: 1,
   },

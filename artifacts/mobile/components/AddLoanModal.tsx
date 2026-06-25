@@ -10,7 +10,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -21,7 +20,23 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
-import { todayDisplay, toStorageDate, isValidDisplayDate, storageToDisplay } from "@/utils/date";
+import { FieldError } from "@/components/FieldError";
+import { AmountInput, IntegerInput, RateInput } from "@/components/NumericInput";
+import { todayDisplay, toStorageDate, storageToDisplay } from "@/utils/date";
+import {
+  parseAmount,
+  parseInterestRate,
+  round2,
+  sanitizeAmountInput,
+  sanitizeRateInput,
+} from "@/utils/numeric";
+import {
+  validateAmount,
+  validateDisplayDate,
+  validateInterestRate,
+  validateRequired,
+  validateTenureYears,
+} from "@/utils/validation";
 
 const LOAN_TYPES = [
   "Personal Loan",
@@ -41,10 +56,6 @@ function maxTenure(loanType: string): number {
   return 30;
 }
 
-function minTenure(loanType: string): number {
-  return 1;
-}
-
 function tenureHint(loanType: string): string {
   const lt = loanType.toLowerCase();
   if (lt.includes("personal")) return "1–5 years";
@@ -55,10 +66,10 @@ function tenureHint(loanType: string): string {
 
 function calcEMI(principal: number, annualRate: number, tenureYears: number): number {
   const n = tenureYears * 12;
-  if (annualRate === 0) return Math.round((principal / n) * 100) / 100;
+  if (annualRate === 0) return round2(principal / n);
   const r = annualRate / 100 / 12;
   const emi = (principal * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
-  return Math.round(emi * 100) / 100;
+  return round2(emi);
 }
 
 interface Props {
@@ -79,17 +90,17 @@ export function AddLoanModal({ visible, onClose, editing }: Props) {
   const [tenure, setTenure] = useState("5");
   const [startDate, setStartDate] = useState(todayDisplay());
   const [emiOverride, setEmiOverride] = useState("");
+  const [emiTouched, setEmiTouched] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  // Auto-computed EMI
   const autoEmi = useMemo(() => {
-    const P = parseFloat(principal);
-    const R = parseFloat(rate);
+    const P = parseAmount(principal);
+    const R = parseInterestRate(rate);
     const T = parseInt(tenure, 10);
-    if (P > 0 && R >= 0 && T >= 1) return calcEMI(P, R, T);
+    if (P && P > 0 && R !== null && T >= 1) return calcEMI(P, R, T);
     return null;
   }, [principal, rate, tenure]);
-
-  const displayEmi = emiOverride || (autoEmi !== null ? String(Math.round(autoEmi)) : "");
 
   useEffect(() => {
     if (editing) {
@@ -99,7 +110,16 @@ export function AddLoanModal({ visible, onClose, editing }: Props) {
       setRate(String(editing.interestRate));
       setTenure(String(editing.tenureYears ?? 5));
       setStartDate(storageToDisplay(editing.startDate));
-      setEmiOverride("");
+      const storedEmi = editing.emi;
+      const computed = calcEMI(
+        editing.principalAmount,
+        editing.interestRate,
+        editing.tenureYears ?? 5,
+      );
+      setEmiOverride(
+        storedEmi && Math.abs(storedEmi - computed) >= 0.01 ? String(storedEmi) : "",
+      );
+      setEmiTouched(false);
     } else {
       setName("");
       setLoanType("Personal Loan");
@@ -108,15 +128,38 @@ export function AddLoanModal({ visible, onClose, editing }: Props) {
       setTenure("5");
       setStartDate(todayDisplay());
       setEmiOverride("");
+      setEmiTouched(false);
     }
+    setTouched({});
+    setSubmitAttempted(false);
   }, [editing, visible]);
 
-  // Reset tenure within limits when loan type changes
   useEffect(() => {
     const t = parseInt(tenure, 10);
     const max = maxTenure(loanType);
     if (t > max) setTenure(String(max));
-  }, [loanType]);
+  }, [loanType, tenure]);
+
+  const displayEmi =
+    emiOverride || (autoEmi !== null ? String(autoEmi) : "");
+
+  const errors = useMemo(
+    () => ({
+      name: validateRequired(name, "Loan name"),
+      principal: validateAmount(principal, "Loan amount"),
+      rate: validateInterestRate(rate),
+      tenure: validateTenureYears(tenure, 1, maxTenure(loanType)),
+      startDate: validateDisplayDate(startDate),
+      emi:
+        emiOverride && (parseAmount(emiOverride) === null || parseAmount(emiOverride)! <= 0)
+          ? "Enter a valid EMI amount."
+          : null,
+    }),
+    [name, principal, rate, tenure, loanType, startDate, emiOverride],
+  );
+
+  const show = (field: keyof typeof errors) =>
+    (touched[field] || submitAttempted) ? errors[field] : null;
 
   const createMutation = useCreateLoan({
     mutation: {
@@ -124,10 +167,6 @@ export function AddLoanModal({ visible, onClose, editing }: Props) {
         qc.invalidateQueries({ queryKey: getGetLoansQueryKey() });
         qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
         onClose();
-      },
-      onError: (err: any) => {
-        const msg = err?.response?.data?.message ?? "Could not save loan.";
-        Alert.alert("Error", msg);
       },
     },
   });
@@ -139,33 +178,22 @@ export function AddLoanModal({ visible, onClose, editing }: Props) {
         qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
         onClose();
       },
-      onError: (err: any) => {
-        const msg = err?.response?.data?.message ?? "Could not update loan.";
-        Alert.alert("Error", msg);
-      },
     },
   });
 
   const isPending = createMutation.isPending || updateMutation.isPending;
+  const saveError =
+    (createMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+    (updateMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message;
 
   const handleSave = () => {
-    if (!name.trim()) return Alert.alert("Required", "Enter a loan name.");
-    const P = parseFloat(principal);
-    if (!P || P <= 0) return Alert.alert("Required", "Enter a valid loan amount.");
-    const R = parseFloat(rate);
-    if (isNaN(R) || R < 0) return Alert.alert("Required", "Enter a valid interest rate (≥ 0).");
-    const T = parseInt(tenure, 10);
-    if (!T || T < 1) return Alert.alert("Required", "Enter a valid tenure (at least 1 year).");
-    const max = maxTenure(loanType);
-    const min = minTenure(loanType);
-    if (T > max) return Alert.alert("Invalid Tenure", `${loanType} allows a maximum of ${max} years.`);
-    if (T < min) return Alert.alert("Invalid Tenure", `${loanType} requires a minimum of ${min} year.`);
-    if (!startDate || !isValidDisplayDate(startDate)) {
-      return Alert.alert("Required", "Enter a valid start date (DD-MM-YYYY).");
-    }
+    setSubmitAttempted(true);
+    if (Object.values(errors).some(Boolean)) return;
 
-    const storedDate = toStorageDate(startDate);
-    const emiVal = emiOverride ? parseFloat(emiOverride) : (autoEmi ?? undefined);
+    const P = round2(parseAmount(principal)!);
+    const R = parseInterestRate(rate)!;
+    const T = parseInt(tenure, 10);
+    const emiVal = emiOverride ? round2(parseAmount(emiOverride)!) : (autoEmi ?? undefined);
 
     const payload: Record<string, unknown> = {
       name: name.trim(),
@@ -173,14 +201,14 @@ export function AddLoanModal({ visible, onClose, editing }: Props) {
       principalAmount: P,
       interestRate: R,
       tenureYears: T,
-      startDate: storedDate,
+      startDate: toStorageDate(startDate),
     };
     if (emiVal && emiVal > 0) payload.emi = emiVal;
 
     if (editing) {
-      updateMutation.mutate({ id: editing.id, data: payload as any });
+      updateMutation.mutate({ id: editing.id, data: payload as never });
     } else {
-      createMutation.mutate({ data: payload as any });
+      createMutation.mutate({ data: payload as never });
     }
   };
 
@@ -207,21 +235,21 @@ export function AddLoanModal({ visible, onClose, editing }: Props) {
           contentContainerStyle={[styles.form, { paddingBottom: insets.bottom + 40 }]}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Loan Name */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Loan Name</Text>
-            <View style={inputStyle}>
+            <View style={[inputStyle, show("name") ? { borderColor: colors.expense } : null]}>
               <TextInput
                 style={[styles.input, { color: colors.text }]}
                 placeholder="e.g. HDFC Home Loan"
                 placeholderTextColor={colors.textSecondary}
                 value={name}
                 onChangeText={setName}
+                onBlur={() => setTouched((t) => ({ ...t, name: true }))}
               />
             </View>
+            <FieldError message={show("name")} />
           </View>
 
-          {/* Loan Type */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Loan Type</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
@@ -243,61 +271,38 @@ export function AddLoanModal({ visible, onClose, editing }: Props) {
             </ScrollView>
           </View>
 
-          {/* Principal Amount */}
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Loan Amount (₹)</Text>
-            <View style={inputStyle}>
-              <Text style={{ color: colors.textSecondary, fontFamily: "Inter_500Medium" }}>₹</Text>
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder="e.g. 2000000"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
-                value={principal}
-                onChangeText={setPrincipal}
-              />
-            </View>
-          </View>
+          <AmountInput
+            label="Loan Amount (₹)"
+            value={principal}
+            onChangeText={(v) => setPrincipal(sanitizeAmountInput(v))}
+            onBlur={() => setTouched((t) => ({ ...t, principal: true }))}
+            error={show("principal")}
+            placeholder="e.g. 2500000"
+          />
 
-          {/* Interest Rate */}
-          <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Interest Rate (% p.a.)</Text>
-            <View style={inputStyle}>
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder="e.g. 8.5"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
-                value={rate}
-                onChangeText={setRate}
-              />
-              <Text style={{ color: colors.textSecondary, fontFamily: "Inter_400Regular" }}>%</Text>
-            </View>
-          </View>
+          <RateInput
+            label="Interest Rate (% p.a.)"
+            value={rate}
+            onChangeText={(v) => setRate(sanitizeRateInput(v))}
+            onBlur={() => setTouched((t) => ({ ...t, rate: true }))}
+            error={show("rate")}
+            placeholder="e.g. 8.35"
+          />
 
-          {/* Tenure */}
-          <View style={styles.field}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>Tenure (Years)</Text>
-              <Text style={[styles.hint, { color: colors.loan }]}>{tenureHint(loanType)}</Text>
-            </View>
-            <View style={inputStyle}>
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder={`e.g. ${maxTenure(loanType)}`}
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
-                value={tenure}
-                onChangeText={setTenure}
-              />
-              <Text style={{ color: colors.textSecondary, fontFamily: "Inter_400Regular" }}>yrs</Text>
-            </View>
-          </View>
+          <IntegerInput
+            label="Tenure (Years)"
+            value={tenure}
+            onChangeText={setTenure}
+            onBlur={() => setTouched((t) => ({ ...t, tenure: true }))}
+            error={show("tenure")}
+            suffix="yrs"
+            placeholder={`e.g. ${maxTenure(loanType)}`}
+          />
+          <Text style={[styles.hint, { color: colors.loan }]}>{tenureHint(loanType)}</Text>
 
-          {/* Start Date */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Start Date</Text>
-            <View style={inputStyle}>
+            <View style={[inputStyle, show("startDate") ? { borderColor: colors.expense } : null]}>
               <Feather name="calendar" size={16} color={colors.textSecondary} />
               <TextInput
                 style={[styles.input, { color: colors.text }]}
@@ -305,11 +310,12 @@ export function AddLoanModal({ visible, onClose, editing }: Props) {
                 placeholderTextColor={colors.textSecondary}
                 value={startDate}
                 onChangeText={setStartDate}
+                onBlur={() => setTouched((t) => ({ ...t, startDate: true }))}
               />
             </View>
+            <FieldError message={show("startDate")} />
           </View>
 
-          {/* EMI (auto-calculated, can override) */}
           <View style={styles.field}>
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>Monthly EMI (₹)</Text>
@@ -317,53 +323,48 @@ export function AddLoanModal({ visible, onClose, editing }: Props) {
                 <Text style={[styles.hint, { color: colors.primary }]}>Auto-calculated</Text>
               )}
               {emiOverride ? (
-                <Pressable onPress={() => setEmiOverride("")}>
+                <Pressable onPress={() => { setEmiOverride(""); setEmiTouched(false); }}>
                   <Text style={[styles.hint, { color: colors.loan }]}>Reset to auto</Text>
                 </Pressable>
               ) : null}
             </View>
-            <View style={[inputStyle, emiOverride ? { borderColor: colors.loan } : {}]}>
-              <Text style={{ color: colors.textSecondary, fontFamily: "Inter_500Medium" }}>₹</Text>
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder={autoEmi !== null ? String(Math.round(autoEmi)) : "Auto-calculated"}
-                placeholderTextColor={autoEmi !== null ? colors.primary : colors.textSecondary}
-                keyboardType="numeric"
-                value={displayEmi}
-                onChangeText={(v) => {
-                  // If user types, treat as override
-                  if (v !== String(autoEmi !== null ? Math.round(autoEmi) : "")) {
-                    setEmiOverride(v);
-                  }
-                }}
-              />
-            </View>
+            <AmountInput
+              label=""
+              value={displayEmi}
+              onChangeText={(v) => {
+                setEmiTouched(true);
+                const cleaned = sanitizeAmountInput(v);
+                if (!emiTouched && autoEmi !== null && cleaned === String(autoEmi)) {
+                  setEmiOverride("");
+                } else {
+                  setEmiOverride(cleaned);
+                }
+              }}
+              onBlur={() => setTouched((t) => ({ ...t, emi: true }))}
+              error={show("emi")}
+              placeholder={autoEmi !== null ? String(autoEmi) : "Auto-calculated"}
+            />
           </View>
 
-          {/* Loan summary preview */}
           {autoEmi !== null && (
             <View style={[styles.summaryBox, { backgroundColor: colors.loan + "12", borderColor: colors.loan + "30" }]}>
               <Text style={[styles.summaryTitle, { color: colors.loan }]}>Loan Summary</Text>
               <View style={styles.summaryRow}>
                 <Text style={[styles.summaryKey, { color: colors.textSecondary }]}>Monthly EMI</Text>
                 <Text style={[styles.summaryVal, { color: colors.text }]}>
-                  ₹{(emiOverride ? parseFloat(emiOverride) : autoEmi).toLocaleString("en-IN")}
+                  ₹{(emiOverride ? parseAmount(emiOverride) : autoEmi)?.toLocaleString("en-IN")}
                 </Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={[styles.summaryKey, { color: colors.textSecondary }]}>Total Months</Text>
-                <Text style={[styles.summaryVal, { color: colors.text }]}>{parseInt(tenure, 10) * 12} months</Text>
+                <Text style={[styles.summaryVal, { color: colors.text }]}>
+                  {parseInt(tenure, 10) * 12} months
+                </Text>
               </View>
-              {parseFloat(principal) > 0 && parseInt(tenure, 10) >= 1 && (
-                <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryKey, { color: colors.textSecondary }]}>Total Interest</Text>
-                  <Text style={[styles.summaryVal, { color: colors.expense }]}>
-                    ₹{Math.round(autoEmi * parseInt(tenure, 10) * 12 - parseFloat(principal)).toLocaleString("en-IN")}
-                  </Text>
-                </View>
-              )}
             </View>
           )}
+
+          {saveError ? <FieldError message={saveError} /> : null}
         </ScrollView>
       </View>
     </Modal>
@@ -386,7 +387,7 @@ const styles = StyleSheet.create({
   form: { padding: 20, gap: 16 },
   field: { gap: 8 },
   label: { fontSize: 13, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.5 },
-  hint: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  hint: { fontSize: 12, fontFamily: "Inter_500Medium", marginTop: -8 },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
