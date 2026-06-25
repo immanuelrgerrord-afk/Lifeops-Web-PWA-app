@@ -20,7 +20,14 @@
       "backgroundColor": "#0A0A0F"
     },
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/images/icon.png",
+      "name": "LifeOps",
+      "shortName": "LifeOps",
+      "description": "Personal finance operations",
+      "lang": "en",
+      "themeColor": "#0A0A0F",
+      "backgroundColor": "#0A0A0F",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-font",

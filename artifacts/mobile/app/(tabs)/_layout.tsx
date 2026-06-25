@@ -75,7 +75,8 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Dashboard",
+          title: "LifeOps",
+          tabBarLabel: "Dashboard",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="chart.pie.fill" tintColor={color} size={22} />
@@ -87,7 +88,8 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="income"
         options={{
-          title: "Income",
+          title: "LifeOps",
+          tabBarLabel: "Income",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="arrow.down.circle.fill" tintColor={color} size={22} />
@@ -99,7 +101,8 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="expenses"
         options={{
-          title: "Expenses",
+          title: "LifeOps",
+          tabBarLabel: "Expenses",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="arrow.up.circle.fill" tintColor={color} size={22} />
@@ -111,7 +114,8 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="loans"
         options={{
-          title: "Loans",
+          title: "LifeOps",
+          tabBarLabel: "Loans",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="building.columns.fill" tintColor={color} size={22} />
@@ -123,7 +127,8 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="goals"
         options={{
-          title: "Goals",
+          title: "LifeOps",
+          tabBarLabel: "Goals",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="flag.fill" tintColor={color} size={22} />

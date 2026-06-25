@@ -6,10 +6,12 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Redirect, Slot, Stack, useRouter, useSegments } from "expo-router";
+import { Redirect, Slot, Stack, useRouter, useSegments, usePathname } from "expo-router";
+import Head from "expo-router/head";
 import * as SplashScreen from "expo-splash-screen";
 import { setBaseUrl } from "@workspace/api-client-react";
 import React, { useEffect } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -46,7 +48,7 @@ function RootLayoutNav() {
   }, [user, loading, segments]);
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, title: "LifeOps" }}>
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="profile" options={{ headerShown: false, presentation: "modal" }} />
@@ -56,12 +58,19 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const pathname = usePathname();
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
   });
+
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      document.title = "LifeOps";
+    }
+  }, [pathname]);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
@@ -72,7 +81,16 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <SafeAreaProvider>
+    <>
+      <Head>
+        <title>LifeOps</title>
+        <meta name="application-name" content="LifeOps" />
+        <meta name="apple-mobile-web-app-title" content="LifeOps" />
+        <meta property="og:title" content="LifeOps" />
+        <meta property="og:site_name" content="LifeOps" />
+        <meta name="description" content="Personal finance operations" />
+      </Head>
+      <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
@@ -85,5 +103,6 @@ export default function RootLayout() {
         </QueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
+    </>
   );
 }

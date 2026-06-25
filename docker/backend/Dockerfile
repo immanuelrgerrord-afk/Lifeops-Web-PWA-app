@@ -24,7 +24,7 @@ FROM builder AS migrate
 
 WORKDIR /app
 
-CMD ["pnpm", "--filter", "@workspace/db", "run", "push"]
+CMD ["pnpm", "--filter", "@workspace/db", "run", "migrate"]
 
 FROM node:24-alpine AS runner
 

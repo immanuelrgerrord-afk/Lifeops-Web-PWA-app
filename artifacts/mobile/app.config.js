@@ -7,13 +7,23 @@ module.exports = ({ config }) => {
 
   return {
     ...config,
+    name: "LifeOps",
     expo: {
       ...config.expo,
+      name: "LifeOps",
       plugins: [
         ["expo-router", { origin }],
         "expo-font",
         "expo-web-browser",
       ],
+      web: {
+        ...config.expo?.web,
+        name: "LifeOps",
+        shortName: "LifeOps",
+        description: "Personal finance operations",
+        themeColor: "#0A0A0F",
+        backgroundColor: "#0A0A0F",
+      },
     },
   };
 };
